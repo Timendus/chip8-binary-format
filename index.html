@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CHIP-8 binary format converter</title>
+    <link rel="stylesheet" href="./index.min.css">
+    <script type="text/javascript" src="./index.js"></script>
+  </head>
+  <body>
+    <main>
+      <section id="welcome" class="active">
+        <h1>CHIP-8 binary format converter</h1>
+        <div id="droptarget">
+          <p>Click or drag here to convert your <code>.ch8</code> or <code>.c8b</code> file</p>
+        </div>
+        <p>Do you want to support <i>CHIP-8 binary format</i> in your own interpreter or assembler? <a href="https://gist.github.com/Timendus/81b7e6a1d8618df649da77aabfb14c75">Get started here!</a></p>
+      </section>
+      <section id="file-properties">
+        <h1 id="properties-header"></h1>
+        <p id="properties-text"></p>
+        <div class="scrolling">
+          <form id="properties">
+            <div class="field">
+              <h2>Target platform(s)</h2>
+              <label>
+                The platform this ROM was developed for:
+                <select name="platform" id="platform-select"></select>
+              </label>
+              <label>
+                Other platforms that this ROM can run on without issues, if any:
+                <select name="compatibility" multiple="multiple" id="compatibility-select"></select>
+              </label>
+            </div>
+            <div class="field">
+              <h2>About the program</h2>
+              <label>
+                Program name:
+                <input type="text" name="name" placeholder="Enter value"/>
+              </label>
+              <label>
+                Author name:
+                <input type="text" name="author" placeholder="Enter value"/>
+              </label>
+              <label>
+                Description:
+                <textarea name="description" rows="6"></textarea>
+              </label>
+            </div>
+          </form>
+          <div class="button">
+            <button class="download-button" data-open="#wrapped" data-close="#file-properties" id="do-unwrap">Download contained .ch8 file</button>
+            <button class="download-button" data-open="#wrapped" data-close="#file-properties" id="do-wrap">Pack information into .c8b file</button>
+          </div>
+        </div>
+      </section>
+      <section id="wrapped">
+        <h1>Here's your file!</h1>
+        <p>Hope we helped</p>
+        <button data-open="#welcome" data-close="#wrapped">Do another one!</button>
+      </section>
+    </main>
+  </body>
+</html>
