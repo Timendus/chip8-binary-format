@@ -35,5 +35,10 @@ module.exports = {
     static: {
       directory: path.resolve(__dirname)
     }
+  },
+  resolve: {
+    alias: {
+      'slim-select': path.resolve(__dirname, './node_modules/slim-select'),
+    }
   }
 }
