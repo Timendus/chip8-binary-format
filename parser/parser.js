@@ -255,5 +255,6 @@ PROPERTIES = {
 module.exports = {
   pack,
   unpack,
-  PLATFORMS
+  PLATFORMS,
+  PROPERTIES
 };

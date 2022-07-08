@@ -17,6 +17,9 @@ const bytecode = new Uint8Array([
 function strToBytes(str) {
   return new Uint8Array(str.split('').map(c => c.charCodeAt(0) & 0xFF));
 }
+function address(addr) {
+  return [ addr >> 8 & 0xFF, addr & 0xFF ];
+}
 
 describe('end to end', () => {
 
@@ -39,31 +42,31 @@ describe('end to end', () => {
 
 });
 
-describe('header and general structure', () => {
+describe('header, name and general structure', () => {
 
   const emptyFile = new Uint8Array([
     ...strToBytes('CBF'),
     parser.PLATFORMS['CHIP-8'],
-    0, 7,
+    ...address(7),
     0
   ]);
 
   const contentFile = new Uint8Array([
     ...strToBytes('CBF'),
     parser.PLATFORMS['XO-CHIP'],
-    0, 15,
-    2, 0, 10,
+    ...address(15),
+    parser.PROPERTIES.name, ...address(10),
     0,
     4, ...strToBytes('Test'),
     ...bytecode
   ]);
 
-  test('build empty file', () => {
+  test('pack empty file', () => {
     const binary = parser.pack({ properties: {}, bytecode: [] });
     expect(binary).toEqual(emptyFile);
   });
 
-  test('build file with contents', () => {
+  test('pack file with contents', () => {
     const binary = parser.pack({ bytecode, properties: {
       platform: 'XO-CHIP',
       name: 'Test'
@@ -71,7 +74,7 @@ describe('header and general structure', () => {
     expect(binary).toEqual(contentFile);
   });
 
-  test('read empty file', () => {
+  test('unpack empty file', () => {
     const unpacked = parser.unpack(emptyFile);
     expect(unpacked.properties).toEqual({
       platform: 0,
@@ -80,7 +83,7 @@ describe('header and general structure', () => {
     expect(unpacked.bytecode).toEqual(new Uint8Array(0));
   });
 
-  test('read file with contents', () => {
+  test('unpack file with contents', () => {
     const unpacked = parser.unpack(contentFile);
     expect(unpacked.properties).toEqual({
       platform: parser.PLATFORMS['XO-CHIP'],
@@ -92,3 +95,34 @@ describe('header and general structure', () => {
 
 });
 
+describe('description', () => {
+
+  const file = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(27),
+    parser.PROPERTIES.description, ...address(10),
+    0,
+    16, ...strToBytes('Description here'),
+    ...bytecode
+  ]);
+
+  test('packing', () => {
+    const binary = parser.pack({ bytecode, properties: {
+      platform: 'CHIP-8',
+      description: 'Description here'
+    }});
+    expect(binary).toEqual(file);
+  });
+
+  test('unpacking', () => {
+    const unpacked = parser.unpack(file);
+    expect(unpacked.properties).toEqual({
+      platform: parser.PLATFORMS['CHIP-8'],
+      platformName: 'CHIP-8',
+      description: 'Description here'
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+});
