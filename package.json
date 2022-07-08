@@ -2,13 +2,15 @@
   "name": "CHIP-8 binary format",
   "scripts": {
     "build": "webpack --mode production",
-    "start": "webpack-dev-server"
+    "start": "webpack-dev-server",
+    "test": "jest"
   },
   "dependencies": {
     "slim-select": "^1.27.1"
   },
   "devDependencies": {
     "file-loader": "^6.2.0",
+    "jest": "^28.1.2",
     "node-sass": "^7.0.1",
     "sass-loader": "^13.0.2",
     "webpack": "^5.73.0",
