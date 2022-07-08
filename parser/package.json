@@ -1,0 +1,43 @@
+{
+  "name": "chip8-binary-format",
+  "version": "0.1.0",
+  "description": "A library to pack and unpack `.c8b` files",
+  "files": [
+    "parser.js"
+  ],
+  "scripts": {
+    "test": "jest",
+    "watch-tests": "jest --watch"
+  },
+  "main": "parser.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Timendus/chip8-binary-format"
+  },
+  "devDependencies": {
+    "jest": "^28.1.2"
+  },
+  "keywords": [
+    "chip-8",
+    "chip8",
+    "schip",
+    "superchip",
+    "xo-chip",
+    "binary",
+    "file",
+    "parser",
+    "format",
+    "pack",
+    "unpack"
+  ],
+  "author": "Timendus",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/Timendus/chip8-binary-format/issues"
+  },
+  "homepage": "https://github.com/Timendus/chip8-binary-format",
+  "jest": {
+    "verbose": true,
+    "collectCoverage": true
+  }
+}

@@ -6,7 +6,7 @@ function pack({ properties, bytecode }) {
   const errors = [];
   const binary = join(
     MAGIC_NUMBER,
-    map(PLATFORMS, properties.platform, errors),
+    map(PLATFORMS, properties.platform || 0, errors),
     0, 0,
     makeProperties(properties, errors)
   );
