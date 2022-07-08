@@ -10,6 +10,7 @@ jobs:
       - name: Install and Build
         run: |
           npm install
+          npm test
           mkdir -p docs
           cp -r index.html CHIP-8\ binary\ format.md docs/
           npm run build
