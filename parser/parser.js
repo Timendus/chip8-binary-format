@@ -68,6 +68,18 @@ function readProperties(binary) {
       case PROPERTIES.cyclesPerFrame:
         properties['cyclesPerFrame'] = bytesToInt(binary.slice(pointer, pointer + 3));
         break;
+      case PROPERTIES.releaseDate:
+        properties['releaseDate'] = new Date(bytesToInt(binary.slice(pointer, pointer + 4)) * 1000);
+        break;
+      case PROPERTIES.image:
+        const planes = binary[pointer];
+        const width = binary[pointer+1];
+        const height = binary[pointer+2];
+        properties['image'] = {
+          planes, width, height,
+          data: binary.slice(pointer+3, pointer+3+planes*width*height)
+        };
+        break;
     }
   } while ( type != PROPERTIES.termination )
   return properties;
@@ -100,6 +112,24 @@ function makeProperties(props, errors) {
       case 'cyclesPerFrame':
         table.push(PROPERTIES.cyclesPerFrame);
         data.push(integerProperty(props[k], 3, errors));
+        break;
+      case 'releaseDate':
+        table.push(PROPERTIES.releaseDate);
+        if ( typeof props[k] == 'object' ) props[k] = +props[k]/1000;
+        data.push(integerProperty(props[k], 4, errors));
+        break;
+      case 'image':
+        table.push(PROPERTIES.image);
+        if ( props[k].hasOwnProperty('width') && props[k].hasOwnProperty('height') && props[k].hasOwnProperty('planes') ) {
+          data.push([
+            ...integerProperty(props[k].planes, 1, errors),
+            ...integerProperty(props[k].width, 1, errors),
+            ...integerProperty(props[k].height, 1, errors),
+            ...props[k].data
+          ]);
+        } else {
+          data.push(props[k]);
+        }
         break;
     }
   });
@@ -262,9 +292,9 @@ PROPERTIES = {
   'authors':            0x04,
   'url':                0x05,
   'urls':               0x05,
-
   'releaseDate':        0x06,
   'image':              0x07,
+
   'keys':               0x08,
   'colours':            0x09,
   'compatibleWith':     0x0A,

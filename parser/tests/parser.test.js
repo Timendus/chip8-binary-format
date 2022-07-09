@@ -299,3 +299,89 @@ describe('cyclesPerFrame', () => {
 
 });
 
+describe('releaseDate', () => {
+
+  const date = new Date('2022-07-09 14:43:00');
+
+  const file = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(10 + 4),
+    parser.PROPERTIES.releaseDate, ...address(10),
+    0,
+    ...value(+date/1000, 4),
+    ...bytecode
+  ]);
+
+  test('packing', () => {
+    expect(parser.pack({ bytecode, properties: {
+      releaseDate: date
+    }})).toEqual(file);
+  });
+
+  test('unpacking', () => {
+    const unpacked = parser.unpack(file);
+    expect(unpacked.properties).toMatchObject({
+      releaseDate: date
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+});
+
+describe('image', () => {
+
+  const imageData = new Uint8Array([
+    0x80, 0x00, 0x80, 0x50, 0x80, 0x50, 0xE2, 0x52,  // planes x width x height bytes,
+    0x95, 0x55, 0x96, 0x55, 0x93, 0x52, 0x00, 0x00,  // containing the cover art image
+    0xFF, 0xFF, 0x00, 0x00, 0x3B, 0x9E, 0x42, 0x50,
+    0x43, 0x9C, 0x42, 0x50, 0x42, 0x50, 0x3B, 0x90
+  ]);
+
+  const image = [
+    0x01,  // Number of planes
+    0x02,  // Width (in bytes)
+    0x10,  // Height (in pixels)
+    ...imageData
+  ];
+
+  const file = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(10 + 35),
+    parser.PROPERTIES.image, ...address(10),
+    0,
+    ...image,
+    ...bytecode
+  ]);
+
+  test('packing', () => {
+    expect(parser.pack({ bytecode, properties: {
+      image
+    }})).toEqual(file);
+
+    expect(parser.pack({ bytecode, properties: {
+      image: {
+        width: 2,
+        height: 16,
+        planes: 1,
+        data: imageData
+      }
+    }})).toEqual(file);
+  });
+
+  test('unpacking', () => {
+    const unpacked = parser.unpack(file);
+    console.log(unpacked.properties);
+    expect(unpacked.properties).toMatchObject({
+      image: {
+        width: 2,
+        height: 16,
+        planes: 1,
+        data: imageData
+      }
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+});
