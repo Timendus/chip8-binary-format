@@ -18,7 +18,13 @@ function strToBytes(str) {
   return new Uint8Array(str.split('').map(c => c.charCodeAt(0) & 0xFF));
 }
 function address(addr) {
-  return [ addr >> 8 & 0xFF, addr & 0xFF ];
+  return value(addr, 2);
+}
+function value(val, numBytes) {
+  const bytes = [];
+  for ( let i = numBytes - 1; i >= 0; i-- )
+    bytes.push(val >> i*8 & 0xFF);
+  return bytes;
 }
 
 describe('end to end', () => {
@@ -62,16 +68,17 @@ describe('header, name and general structure', () => {
   ]);
 
   test('pack empty file', () => {
-    const binary = parser.pack({ properties: {}, bytecode: [] });
-    expect(binary).toEqual(emptyFile);
+    expect(parser.pack({
+      properties: {},
+      bytecode: []
+    })).toEqual(emptyFile);
   });
 
   test('pack file with contents', () => {
-    const binary = parser.pack({ bytecode, properties: {
+    expect(parser.pack({ bytecode, properties: {
       platform: 'XO-CHIP',
       name: 'Test'
-    }});
-    expect(binary).toEqual(contentFile);
+    }})).toEqual(contentFile);
   });
 
   test('unpack empty file', () => {
@@ -108,21 +115,187 @@ describe('description', () => {
   ]);
 
   test('packing', () => {
-    const binary = parser.pack({ bytecode, properties: {
-      platform: 'CHIP-8',
+    expect(parser.pack({ bytecode, properties: {
       description: 'Description here'
-    }});
-    expect(binary).toEqual(file);
+    }})).toEqual(file);
   });
 
   test('unpacking', () => {
     const unpacked = parser.unpack(file);
-    expect(unpacked.properties).toEqual({
-      platform: parser.PLATFORMS['CHIP-8'],
-      platformName: 'CHIP-8',
+    expect(unpacked.properties).toMatchObject({
       description: 'Description here'
     });
     expect(unpacked.bytecode).toEqual(bytecode);
   });
 
 });
+
+describe('author, authors', () => {
+
+  const file = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(10 + 9),
+    parser.PROPERTIES.author, ...address(10),
+    0,
+    8, ...strToBytes('Timendus'),
+    ...bytecode
+  ]);
+
+  const multipleFile = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(13 + 9 + 18),
+    parser.PROPERTIES.author, ...address(13),
+    parser.PROPERTIES.author, ...address(22),
+    0,
+    8, ...strToBytes('Timendus'),
+    17, ...strToBytes('Joseph Weisbecker'),
+    ...bytecode
+  ]);
+
+  test('packing with a single author', () => {
+    expect(parser.pack({ bytecode, properties: {
+      author: 'Timendus'
+    }})).toEqual(file);
+    expect(parser.pack({ bytecode, properties: {
+      author: ['Timendus']
+    }})).toEqual(file);
+    expect(parser.pack({ bytecode, properties: {
+      authors: 'Timendus'
+    }})).toEqual(file);
+    expect(parser.pack({ bytecode, properties: {
+      authors: ['Timendus']
+    }})).toEqual(file);
+  });
+
+  test('packing with multiple authors', () => {
+    expect(parser.pack({ bytecode, properties: {
+      author: ['Timendus', 'Joseph Weisbecker']
+    }})).toEqual(multipleFile);
+    expect(parser.pack({ bytecode, properties: {
+      authors: ['Timendus', 'Joseph Weisbecker']
+    }})).toEqual(multipleFile);
+  });
+
+  test('unpacking with a single author', () => {
+    const unpacked = parser.unpack(file);
+    expect(unpacked.properties).toMatchObject({
+      authors: ['Timendus']
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+  test('unpacking with multiple authors', () => {
+    const unpacked = parser.unpack(multipleFile);
+    expect(unpacked.properties).toMatchObject({
+      authors: ['Timendus', 'Joseph Weisbecker']
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+});
+
+describe('url, urls', () => {
+
+  const file = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(10 + 48),
+    parser.PROPERTIES.url, ...address(10),
+    0,
+    47, ...strToBytes('https://github.com/Timendus/chip8-binary-format'),
+    ...bytecode
+  ]);
+
+  const multipleFile = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(13 + 48 + 48),
+    parser.PROPERTIES.url, ...address(13),
+    parser.PROPERTIES.url, ...address(61),
+    0,
+    47, ...strToBytes('https://github.com/Timendus/chip8-binary-format'),
+    47, ...strToBytes('https://timendus.github.io/chip8-binary-format/'),
+    ...bytecode
+  ]);
+
+  test('packing with a single url', () => {
+    expect(parser.pack({ bytecode, properties: {
+      url: 'https://github.com/Timendus/chip8-binary-format'
+    }})).toEqual(file);
+    expect(parser.pack({ bytecode, properties: {
+      url: ['https://github.com/Timendus/chip8-binary-format']
+    }})).toEqual(file);
+    expect(parser.pack({ bytecode, properties: {
+      urls: 'https://github.com/Timendus/chip8-binary-format'
+    }})).toEqual(file);
+    expect(parser.pack({ bytecode, properties: {
+      urls: ['https://github.com/Timendus/chip8-binary-format']
+    }})).toEqual(file);
+  });
+
+  test('packing with multiple urls', () => {
+    expect(parser.pack({ bytecode, properties: {
+      url: [
+        'https://github.com/Timendus/chip8-binary-format',
+        'https://timendus.github.io/chip8-binary-format/'
+      ]
+    }})).toEqual(multipleFile);
+    expect(parser.pack({ bytecode, properties: {
+      urls: [
+        'https://github.com/Timendus/chip8-binary-format',
+        'https://timendus.github.io/chip8-binary-format/'
+      ]
+    }})).toEqual(multipleFile);
+  });
+
+  test('unpacking with a single url', () => {
+    const unpacked = parser.unpack(file);
+    expect(unpacked.properties).toMatchObject({
+      urls: ['https://github.com/Timendus/chip8-binary-format']
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+  test('unpacking with multiple urls', () => {
+    const unpacked = parser.unpack(multipleFile);
+    expect(unpacked.properties).toMatchObject({
+      urls: [
+        'https://github.com/Timendus/chip8-binary-format',
+        'https://timendus.github.io/chip8-binary-format/'
+      ]
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+});
+
+describe('cyclesPerFrame', () => {
+
+  const file = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(10 + 3),
+    parser.PROPERTIES.cyclesPerFrame, ...address(10),
+    0,
+    ...value(200000, 3),
+    ...bytecode
+  ]);
+
+  test('packing', () => {
+    expect(parser.pack({ bytecode, properties: {
+      cyclesPerFrame: 200000
+    }})).toEqual(file);
+  });
+
+  test('unpacking', () => {
+    const unpacked = parser.unpack(file);
+    expect(unpacked.properties).toMatchObject({
+      cyclesPerFrame: 200000
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+});
+

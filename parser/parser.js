@@ -57,6 +57,17 @@ function readProperties(binary) {
       case PROPERTIES.description:
         properties['description'] = bytesToStr(binary.slice(pointer + 1, pointer + 1 + binary[pointer]));
         break;
+      case PROPERTIES.author:
+        properties['authors'] = properties['authors'] || [];
+        properties['authors'].push(bytesToStr(binary.slice(pointer + 1, pointer + 1 + binary[pointer])));
+        break;
+      case PROPERTIES.url:
+        properties['urls'] = properties['urls'] || [];
+        properties['urls'].push(bytesToStr(binary.slice(pointer + 1, pointer + 1 + binary[pointer])));
+        break;
+      case PROPERTIES.cyclesPerFrame:
+        properties['cyclesPerFrame'] = bytesToInt(binary.slice(pointer, pointer + 3));
+        break;
     }
   } while ( type != PROPERTIES.termination )
   return properties;
@@ -118,12 +129,7 @@ function stringProperty(str, prop, errors) {
 // Encode an integer into its binary form. If it can't be encoded, add errors.
 function integerProperty(value, bytes, errors) {
   if ( !assert(typeof value == 'number', `Value should be a number: ${value}`, errors) ) return [];
-
-  const result = [];
-  for ( let i = bytes - 1; i >= 0; i-- ) {
-    result.push(value >> (i*8) & 0xFF);
-  }
-  return result;
+  return intToBytes(value, bytes);
 }
 
 // Take a string and encode it into an array representing the ascii values of
@@ -135,6 +141,20 @@ function strToBytes(str) {
 // Take an array of ascii values and convert back to a string
 function bytesToStr(bytes) {
   return String.fromCharCode(...bytes);
+}
+
+// Take an integer value and convert it to `bytes` number of bytes
+function intToBytes(value, bytes) {
+  const result = [];
+  for ( let i = bytes - 1; i >= 0; i-- ) {
+    result.push(value >> (i*8) & 0xFF);
+  }
+  return result;
+}
+
+// Take an array of bytes and convert it into an integer
+function bytesToInt(bytes) {
+  return bytes.reduce((a, v, i) => v << 8*(bytes.length-1-i) | a, 0);
 }
 
 // Return the concatenation of all parameters as a Uint8Array, also works when
