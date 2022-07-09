@@ -2,7 +2,7 @@ import FileTarget from './FileTarget';
 import Energize from './Energize';
 import Click from './Click';
 import SlimSelect from 'slim-select';
-const parser = require('../parser/parser.js');
+const parser = require('../../parser/parser.js');
 
 let bytecode, properties, filename;
 

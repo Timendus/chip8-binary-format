@@ -7,7 +7,7 @@ module.exports = {
         __dirname + '/scss/index.scss'
     ],
   output: {
-    path: path.join(path.resolve(__dirname), 'docs'),
+    path: path.join(path.resolve(__dirname), 'build'),
     filename: 'index.js'
   },
   module: {
