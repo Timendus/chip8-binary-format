@@ -1,0 +1,12 @@
+{
+  "name": "CHIP-8 Test Suite",
+  "author": "Timendus",
+  "url": "https://github.com/Timendus/chip8-test-suite",
+  "description": "A single ROM image containing six distinct tests that will aid you in developing your own CHIP-8, SCHIP or XO-CHIP interpreter (or \"emulator\")",
+  "keys": {
+    "up": 14,
+    "down": 15,
+    "a": 10,
+    "b": 10
+  }
+}
