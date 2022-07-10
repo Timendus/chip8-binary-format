@@ -90,7 +90,7 @@ expectMapping({
     ...address(15),
     cbf.PROPERTY.name, ...address(10),
     cbf.PROPERTY.termination,
-    4, ...strToBytes('Test'),
+    ...strToBytes('Test'), 0,
     ...bytecode
   ]),
 
@@ -110,7 +110,7 @@ expectMapping({
     ...address(27),
     cbf.PROPERTY.description, ...address(10),
     cbf.PROPERTY.termination,
-    16, ...strToBytes('Description here'),
+    ...strToBytes('Description here'), 0,
     ...bytecode
   ]),
 
@@ -127,7 +127,7 @@ describe('author, authors', () => {
     ...address(10 + 9),
     cbf.PROPERTY.author, ...address(10),
     cbf.PROPERTY.termination,
-    8, ...strToBytes('Timendus'),
+    ...strToBytes('Timendus'), 0,
     ...bytecode
   ]);
 
@@ -138,8 +138,8 @@ describe('author, authors', () => {
     cbf.PROPERTY.author, ...address(13),
     cbf.PROPERTY.author, ...address(22),
     cbf.PROPERTY.termination,
-    8, ...strToBytes('Timendus'),
-    17, ...strToBytes('Joseph Weisbecker'),
+    ...strToBytes('Timendus'), 0,
+    ...strToBytes('Joseph Weisbecker'), 0,
     ...bytecode
   ]);
 
@@ -193,7 +193,7 @@ describe('url, urls', () => {
     ...address(10 + 48),
     cbf.PROPERTY.url, ...address(10),
     cbf.PROPERTY.termination,
-    47, ...strToBytes('https://github.com/Timendus/chip8-binary-format'),
+    ...strToBytes('https://github.com/Timendus/chip8-binary-format'), 0,
     ...bytecode
   ]);
 
@@ -204,8 +204,8 @@ describe('url, urls', () => {
     cbf.PROPERTY.url, ...address(13),
     cbf.PROPERTY.url, ...address(61),
     cbf.PROPERTY.termination,
-    47, ...strToBytes('https://github.com/Timendus/chip8-binary-format'),
-    47, ...strToBytes('https://timendus.github.io/chip8-binary-format/'),
+    ...strToBytes('https://github.com/Timendus/chip8-binary-format'), 0,
+    ...strToBytes('https://timendus.github.io/chip8-binary-format/'), 0,
     ...bytecode
   ]);
 

@@ -26,5 +26,8 @@ glob(__dirname + '/ch8/*.ch8', {}, (err, files)=>{
       else
         console.error(e);
     }
+
+    // For testing if it came out right
+    // console.log(cbf.unpack(fs.readFileSync(cbfFile)));
   });
 });

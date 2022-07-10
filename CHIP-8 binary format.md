@@ -255,63 +255,61 @@ The execution speed is defined in three bytes, big endian.
 
 ### `0x02` Program name
 
-An ASCII string containing the name of the program, starting with a length byte.
+An ASCII string containing the name of the program, terminated by a zero.
 
 #### Example
 
 ```python
-0x0E                                # Read 14 bytes
 0x53 0x70 0x61 0x63 0x65 0x20 0x49  # "Space Invaders"
 0x6e 0x76 0x61 0x64 0x65 0x72 0x73
+0x00                                # End of string
 ```
 
 ### `0x03` Program description
 
-An ASCII string containing a description of the program, starting with a length
-byte.
+An ASCII string containing a description of the program, terminated by a zero.
 
 #### Example
 
 ```python
-0x29                                # Read 41 bytes
 0x41 0x20 0x67 0x61 0x6d 0x65 0x20  # "A game for two, each controlling a paddle"
 0x66 0x6f 0x72 0x20 0x74 0x77 0x6f
 0x2c 0x20 0x65 0x61 0x63 0x68 0x20
 0x63 0x6f 0x6e 0x74 0x72 0x6f 0x6c
 0x6c 0x69 0x6e 0x67 0x20 0x61 0x20
 0x70 0x61 0x64 0x64 0x6c 0x65
+0x00                                # End of string
 ```
 
 ### `0x04` Program author
 
-An ASCII string containing the name of the author of the program, starting with
-a length byte. Note that this type may occur more than once in the properties
-table, in which case multiple of these structures can be present in the data
-segment.
+An ASCII string containing the name of the author of the program, terminated by
+a zero. Note that this type may occur more than once in the properties table, in
+which case multiple of these structures can be present in the data segment.
 
 #### Example
 
 ```python
-0x11                                # Read 17 bytes
 0x4a 0x6f 0x73 0x65 0x70 0x68 0x20  # "Joseph Weisbecker"
 0x57 0x65 0x69 0x73 0x62 0x65 0x63
 0x6b 0x65 0x72
+0x00                                # End of string
 ```
 
 ### `0x05` Program URL
 
 An ASCII string containing a URL, linking to more information about the program,
-starting with a length byte. Note that this type may occur more than once in the
-properties table, in which case multiple of these structures can be present in the
-data segment.
+terminated by a zero. Note that this type may occur more than once in the
+properties table, in which case multiple of these structures can be present in
+the data segment.
 
 #### Example
 
 ```python
-0x15                                # Read 21 bytes
 0x68 0x74 0x74 0x70 0x3a 0x2f 0x2f  # "http://www.google.com"
 0x77 0x77 0x77 0x2e 0x67 0x6f 0x6f
 0x67 0x6c 0x65 0x2e 0x63 0x6f 0x6d
+0x00                                # End of string
 ```
 
 ### `0x06` Program release date

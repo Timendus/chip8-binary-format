@@ -52,18 +52,18 @@ function readProperties(binary) {
 
     switch(type) {
       case PROPERTY.name:
-        properties['name'] = bytesToStr(binary.slice(pointer + 1, pointer + 1 + binary[pointer]));
+        properties['name'] = bytesToStr(binary.slice(pointer, pointer + findLength(binary, pointer)));
         break;
       case PROPERTY.description:
-        properties['description'] = bytesToStr(binary.slice(pointer + 1, pointer + 1 + binary[pointer]));
+        properties['description'] = bytesToStr(binary.slice(pointer, pointer + findLength(binary, pointer)));
         break;
       case PROPERTY.author:
         properties['authors'] = properties['authors'] || [];
-        properties['authors'].push(bytesToStr(binary.slice(pointer + 1, pointer + 1 + binary[pointer])));
+        properties['authors'].push(bytesToStr(binary.slice(pointer, pointer + findLength(binary, pointer))));
         break;
       case PROPERTY.url:
         properties['urls'] = properties['urls'] || [];
-        properties['urls'].push(bytesToStr(binary.slice(pointer + 1, pointer + 1 + binary[pointer])));
+        properties['urls'].push(bytesToStr(binary.slice(pointer, pointer + findLength(binary, pointer))));
         break;
       case PROPERTY.cyclesPerFrame:
         properties['cyclesPerFrame'] = bytesToInt(binary.slice(pointer, pointer + 3));
@@ -202,10 +202,8 @@ function makeProperties(props, errors) {
 // Encode a string into its binary form. If it can't be encoded, add errors.
 function stringProperty(str, prop, errors) {
   if ( !assert(typeof str == 'string', `Value should be a string: ${str}`, errors) ) return [];
-  if ( !assert(str.length <= 255, `Length of ${prop} should be at most 255 characters`, errors) ) return [];
-
-  const stringBytes = str.split('').map(c => c.charCodeAt(0) & 0xFF);
-  stringBytes.unshift(stringBytes.length);
+  const stringBytes = strToBytes(str);
+  stringBytes.push(0);
   return stringBytes;
 }
 
@@ -224,6 +222,10 @@ function strToBytes(str) {
 // Take an array of ascii values and convert back to a string
 function bytesToStr(bytes) {
   return String.fromCharCode(...bytes);
+}
+
+function findLength(binary, offset) {
+  return binary.slice(offset).indexOf(0);
 }
 
 // Take an integer value and convert it to `bytes` number of bytes
