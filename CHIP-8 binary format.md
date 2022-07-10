@@ -221,7 +221,8 @@ file.
 * `0x0A` - Pointer to [compatibility configuration](#0x0a-compatibility-configuration)
 * `0x0B` - Pointer to [screen orientation](#0x0b-screen-orientation)
 * `0x0C` - Pointer to [font data](#0x0c-font-data)
-* `0x0D - 0x7F` - Range reserved for future community standardisation
+* `0x0D` - Pointer to [tool vanity](#0x0d-tool-vanity)
+* `0x0E - 0x7F` - Range reserved for future community standardisation
 * `0x80 - 0xFF` - Range free for personal use of your interpreter specific needs
 
 ## Data segment
@@ -491,4 +492,16 @@ interpreter. With this data structure, the font can be supplied with the ROM.
 
 ### `0x0D` Tool vanity
 
-TODO
+An ASCII string where tooling can leave a vanity text, terminated by a zero.
+Please don't pollute the other fields with nonsense 😄
+
+#### Example
+
+```python
+0x46 0x69 0x6c 0x65 0x20 0x63 0x72  # "File created by AwesomeChip2000"
+0x65 0x61 0x74 0x65 0x64 0x20 0x62
+0x79 0x20 0x41 0x77 0x65 0x73 0x6f
+0x6d 0x65 0x43 0x68 0x69 0x70 0x32
+0x30 0x30 0x30
+0x00                                # End of string
+```
