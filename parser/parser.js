@@ -80,6 +80,30 @@ function readProperties(binary) {
           data: binary.slice(pointer+3, pointer+3+planes*width*height)
         };
         break;
+      case PROPERTIES.keys:
+        properties['keys'] = {};
+        for ( let i = 0; i < binary[pointer]; i++ )
+          properties['keys'][Object.keys(KEYS).find(key => KEYS[key] == binary[pointer+1+i*2])] = binary[pointer+1+i*2+1];
+        break;
+      case PROPERTIES.colours:
+        properties['colours'] = [];
+        for ( let i = 0; i < binary[pointer]; i++ )
+          properties['colours'].push([binary[pointer+(3*i)+1], binary[pointer+(3*i)+2], binary[pointer+(3*i)+3]])
+        break;
+      case PROPERTIES.compatibleWith:
+        properties['compatibleWith'] = [];
+        for ( let i = 0; i < binary[pointer]; i++ )
+          properties['compatibleWith'].push(binary[pointer+1+i]);
+        break;
+      case PROPERTIES.screenOrientation:
+        properties['screenOrientation'] = Object.keys(SCREEN_ORIENTATION).find(key => SCREEN_ORIENTATION[key] == binary[pointer]);
+        break;
+      case PROPERTIES.fontData:
+        properties['fontData'] = {
+          address: bytesToInt(binary.slice(pointer, pointer+2)),
+          data: binary.slice(pointer+3, pointer+3+binary[pointer+2])
+        };
+        break;
     }
   } while ( type != PROPERTIES.termination )
   return properties;
@@ -130,6 +154,35 @@ function makeProperties(props, errors) {
         } else {
           data.push(props[k]);
         }
+        break;
+      case 'keys':
+        table.push(PROPERTIES.keys);
+        const bytes = [Object.keys(props[k]).length];
+        for ( const key of Object.keys(props[k]) ) {
+          bytes.push(KEYS[key]);
+          bytes.push(props[k][key]);
+        }
+        data.push(bytes);
+        break;
+      case 'colours':
+        table.push(PROPERTIES.colours);
+        data.push([props[k].length, ...props[k].flat()]);
+        break;
+      case 'compatibleWith':
+        table.push(PROPERTIES.compatibleWith);
+        data.push([props[k].length, ...props[k]]);
+        break;
+      case 'screenOrientation':
+        table.push(PROPERTIES.screenOrientation);
+        data.push(SCREEN_ORIENTATION[props[k]]);
+        break;
+      case 'fontData':
+        table.push(PROPERTIES.fontData);
+        data.push([
+          ...intToBytes(props[k].address, 2),
+          ...intToBytes(props[k].data.length, 1),
+          ...props[k].data
+        ]);
         break;
     }
   });
@@ -294,17 +347,34 @@ PROPERTIES = {
   'urls':               0x05,
   'releaseDate':        0x06,
   'image':              0x07,
-
   'keys':               0x08,
   'colours':            0x09,
   'compatibleWith':     0x0A,
   'screenOrientation':  0x0B,
-  'fontData':           0x0C,
+  'fontData':           0x0C
 };
+
+KEYS = {
+  'up':     0x00,
+  'down':   0x01,
+  'left':   0x02,
+  'right':  0x03,
+  'a':      0x04,
+  'b':      0x05
+}
+
+SCREEN_ORIENTATION = {
+  'normal':     0x00,  // Display is on its feet, top is up
+  'right':      0x01,  // Display is put on its right side, left side is up
+  'left':       0x02,  // Display is put on its left side, right side is up
+  'upsidedown': 0x03,  // Display is upside down, bottom is up
+}
 
 module.exports = {
   pack,
   unpack,
   PLATFORMS,
-  PROPERTIES
+  PROPERTIES,
+  KEYS,
+  SCREEN_ORIENTATION
 };

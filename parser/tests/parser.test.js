@@ -385,3 +385,172 @@ describe('image', () => {
   });
 
 });
+
+describe('keys', () => {
+
+  const keymap = {
+    'up': 5,
+    'down': 8,
+    'left': 7,
+    'right': 9,
+    'a': 6,
+    'b': 4
+  };
+
+  const file = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(10 + 13),
+    parser.PROPERTIES.keys, ...address(10),
+    0,
+    Object.keys(keymap).length,
+    ...Object.keys(keymap).map(key => [parser.KEYS[key], keymap[key]]).flat(),
+    ...bytecode
+  ]);
+
+  test('packing', () => {
+    expect(parser.pack({ bytecode, properties: {
+      keys: keymap
+    }})).toEqual(file);
+  });
+
+  test('unpacking', () => {
+    const unpacked = parser.unpack(file);
+    expect(unpacked.properties).toMatchObject({
+      keys: keymap
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+});
+
+describe('colours', () => {
+
+  const colours = [
+    [ 0x15, 0x64, 0x11 ],  // Dark green for the value 0
+    [ 0x9a, 0xf6, 0x95 ]   // Light green for the value 1
+  ];
+
+  const file = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(10 + 7),
+    parser.PROPERTIES.colours, ...address(10),
+    0,
+    colours.length, ...colours.flat(),
+    ...bytecode
+  ]);
+
+  test('packing', () => {
+    expect(parser.pack({ bytecode, properties: {
+      colours: colours
+    }})).toEqual(file);
+  });
+
+  test('unpacking', () => {
+    const unpacked = parser.unpack(file);
+    expect(unpacked.properties).toMatchObject({
+      colours: colours
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+});
+
+describe('compatibility', () => {
+
+  const compatibility = [
+    parser.PLATFORMS['XO-CHIP'],
+    parser.PLATFORMS['CHIP-8 for ETI-660']
+  ];
+
+  const file = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(10 + 3),
+    parser.PROPERTIES.compatibleWith, ...address(10),
+    0,
+    compatibility.length, ...compatibility,
+    ...bytecode
+  ]);
+
+  test('packing', () => {
+    expect(parser.pack({ bytecode, properties: {
+      compatibleWith: compatibility
+    }})).toEqual(file);
+  });
+
+  test('unpacking', () => {
+    const unpacked = parser.unpack(file);
+    expect(unpacked.properties).toMatchObject({
+      compatibleWith: compatibility
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+});
+
+describe('screen orientation', () => {
+
+  const file = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(10 + 1),
+    parser.PROPERTIES.screenOrientation, ...address(10),
+    parser.PROPERTIES.termination,
+    parser.SCREEN_ORIENTATION.right,
+    ...bytecode
+  ]);
+
+  test('packing', () => {
+    expect(parser.pack({ bytecode, properties: {
+      screenOrientation: 'right'
+    }})).toEqual(file);
+  });
+
+  test('unpacking', () => {
+    const unpacked = parser.unpack(file);
+    expect(unpacked.properties).toMatchObject({
+      screenOrientation: 'right'
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+});
+
+describe('font data', () => {
+
+  const font = new Uint8Array([ 1, 2, 3, 4, 5 ]);
+
+  const file = new Uint8Array([
+    ...strToBytes('CBF'),
+    parser.PLATFORMS['CHIP-8'],
+    ...address(10 + 8),
+    parser.PROPERTIES.fontData, ...address(10),
+    parser.PROPERTIES.termination,
+    0x01, 0x00,  // Load to address 0x100
+    font.length, ...font,
+    ...bytecode
+  ]);
+
+  test('packing', () => {
+    expect(parser.pack({ bytecode, properties: {
+      fontData: {
+        address: 0x100,
+        data: font
+      }
+    }})).toEqual(file);
+  });
+
+  test('unpacking', () => {
+    const unpacked = parser.unpack(file);
+    expect(unpacked.properties).toMatchObject({
+      fontData: {
+        address: 0x100,
+        data: font
+      }
+    });
+    expect(unpacked.bytecode).toEqual(bytecode);
+  });
+
+});
