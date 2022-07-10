@@ -6,7 +6,7 @@ function pack({ properties, bytecode }) {
   const errors = [];
   const binary = join(
     MAGIC_NUMBER,
-    map(PLATFORMS, properties.platform || 0, errors),
+    map(PLATFORM, properties.platform || 0, errors),
     0, 0,
     makeProperties(properties, errors)
   );
@@ -28,7 +28,7 @@ function unpack(binary) {
   return {
     properties: {
       platform: binary[3],
-      platformName: Object.keys(PLATFORMS).find(key => PLATFORMS[key] == binary[3]),
+      platformName: Object.keys(PLATFORM).find(key => PLATFORM[key] == binary[3]),
       ...readProperties(binary)
     },
     bytecode: binary.slice(binary[4] << 8 | binary[5], binary.length)
@@ -51,27 +51,27 @@ function readProperties(binary) {
     offset += 3;
 
     switch(type) {
-      case PROPERTIES.name:
+      case PROPERTY.name:
         properties['name'] = bytesToStr(binary.slice(pointer + 1, pointer + 1 + binary[pointer]));
         break;
-      case PROPERTIES.description:
+      case PROPERTY.description:
         properties['description'] = bytesToStr(binary.slice(pointer + 1, pointer + 1 + binary[pointer]));
         break;
-      case PROPERTIES.author:
+      case PROPERTY.author:
         properties['authors'] = properties['authors'] || [];
         properties['authors'].push(bytesToStr(binary.slice(pointer + 1, pointer + 1 + binary[pointer])));
         break;
-      case PROPERTIES.url:
+      case PROPERTY.url:
         properties['urls'] = properties['urls'] || [];
         properties['urls'].push(bytesToStr(binary.slice(pointer + 1, pointer + 1 + binary[pointer])));
         break;
-      case PROPERTIES.cyclesPerFrame:
+      case PROPERTY.cyclesPerFrame:
         properties['cyclesPerFrame'] = bytesToInt(binary.slice(pointer, pointer + 3));
         break;
-      case PROPERTIES.releaseDate:
+      case PROPERTY.releaseDate:
         properties['releaseDate'] = new Date(bytesToInt(binary.slice(pointer, pointer + 4)) * 1000);
         break;
-      case PROPERTIES.image:
+      case PROPERTY.image:
         const planes = binary[pointer];
         const width = binary[pointer+1];
         const height = binary[pointer+2];
@@ -80,32 +80,32 @@ function readProperties(binary) {
           data: binary.slice(pointer+3, pointer+3+planes*width*height)
         };
         break;
-      case PROPERTIES.keys:
+      case PROPERTY.keys:
         properties['keys'] = {};
         for ( let i = 0; i < binary[pointer]; i++ )
-          properties['keys'][Object.keys(KEYS).find(key => KEYS[key] == binary[pointer+1+i*2])] = binary[pointer+1+i*2+1];
+          properties['keys'][Object.keys(KEY).find(key => KEY[key] == binary[pointer+1+i*2])] = binary[pointer+1+i*2+1];
         break;
-      case PROPERTIES.colours:
+      case PROPERTY.colours:
         properties['colours'] = [];
         for ( let i = 0; i < binary[pointer]; i++ )
           properties['colours'].push([binary[pointer+(3*i)+1], binary[pointer+(3*i)+2], binary[pointer+(3*i)+3]])
         break;
-      case PROPERTIES.compatibleWith:
+      case PROPERTY.compatibleWith:
         properties['compatibleWith'] = [];
         for ( let i = 0; i < binary[pointer]; i++ )
           properties['compatibleWith'].push(binary[pointer+1+i]);
         break;
-      case PROPERTIES.screenOrientation:
+      case PROPERTY.screenOrientation:
         properties['screenOrientation'] = Object.keys(SCREEN_ORIENTATION).find(key => SCREEN_ORIENTATION[key] == binary[pointer]);
         break;
-      case PROPERTIES.fontData:
+      case PROPERTY.fontData:
         properties['fontData'] = {
           address: bytesToInt(binary.slice(pointer, pointer+2)),
           data: binary.slice(pointer+3, pointer+3+binary[pointer+2])
         };
         break;
     }
-  } while ( type != PROPERTIES.termination )
+  } while ( type != PROPERTY.termination )
   return properties;
 }
 
@@ -115,12 +115,12 @@ function makeProperties(props, errors) {
   // Convert all the properties to the correct data structures
   let table = [];
   const data = [];
-  Object.keys(PROPERTIES).forEach(k => {
+  Object.keys(PROPERTY).forEach(k => {
     if ( !props.hasOwnProperty(k) || props[k] == undefined || props[k] == '' ) return;
     switch(k) {
       case 'name':
       case 'description':
-        table.push(PROPERTIES[k]);
+        table.push(PROPERTY[k]);
         data.push(stringProperty(props[k], k, errors));
         break;
       case 'author':
@@ -129,21 +129,21 @@ function makeProperties(props, errors) {
       case 'urls':
         if ( typeof props[k] != 'object' ) props[k] = [props[k]];
         props[k].forEach(value => {
-          table.push(PROPERTIES[k]);
+          table.push(PROPERTY[k]);
           data.push(stringProperty(value, k, errors));
         });
         break;
       case 'cyclesPerFrame':
-        table.push(PROPERTIES.cyclesPerFrame);
+        table.push(PROPERTY.cyclesPerFrame);
         data.push(integerProperty(props[k], 3, errors));
         break;
       case 'releaseDate':
-        table.push(PROPERTIES.releaseDate);
+        table.push(PROPERTY.releaseDate);
         if ( typeof props[k] == 'object' ) props[k] = +props[k]/1000;
         data.push(integerProperty(props[k], 4, errors));
         break;
       case 'image':
-        table.push(PROPERTIES.image);
+        table.push(PROPERTY.image);
         if ( props[k].hasOwnProperty('width') && props[k].hasOwnProperty('height') && props[k].hasOwnProperty('planes') ) {
           data.push([
             ...integerProperty(props[k].planes, 1, errors),
@@ -156,28 +156,28 @@ function makeProperties(props, errors) {
         }
         break;
       case 'keys':
-        table.push(PROPERTIES.keys);
+        table.push(PROPERTY.keys);
         const bytes = [Object.keys(props[k]).length];
         for ( const key of Object.keys(props[k]) ) {
-          bytes.push(KEYS[key]);
+          bytes.push(KEY[key]);
           bytes.push(props[k][key]);
         }
         data.push(bytes);
         break;
       case 'colours':
-        table.push(PROPERTIES.colours);
+        table.push(PROPERTY.colours);
         data.push([props[k].length, ...props[k].flat()]);
         break;
       case 'compatibleWith':
-        table.push(PROPERTIES.compatibleWith);
+        table.push(PROPERTY.compatibleWith);
         data.push([props[k].length, ...props[k]]);
         break;
       case 'screenOrientation':
-        table.push(PROPERTIES.screenOrientation);
+        table.push(PROPERTY.screenOrientation);
         data.push(SCREEN_ORIENTATION[props[k]]);
         break;
       case 'fontData':
-        table.push(PROPERTIES.fontData);
+        table.push(PROPERTY.fontData);
         data.push([
           ...intToBytes(props[k].address, 2),
           ...intToBytes(props[k].data.length, 1),
@@ -194,7 +194,7 @@ function makeProperties(props, errors) {
     offset += data[i].length;
     return entry;
   });
-  table.push(PROPERTIES.termination);
+  table.push(PROPERTY.termination);
 
   return join(table.flat(), data.flat());
 }
@@ -279,7 +279,7 @@ function assert(assertion, message, errors) {
 
 MAGIC_NUMBER = strToBytes('CBF');
 
-PLATFORMS = {
+PLATFORM = {
   'CHIP-8':                                                           0x00,
   'CHIP-8 1/2':                                                       0x01,
   'CHIP-8I':                                                          0x02,
@@ -336,7 +336,7 @@ PLATFORMS = {
   'CHIP-8 Classic / Color':                                           0x35,
 };
 
-PROPERTIES = {
+PROPERTY = {
   'termination':        0x00,
   'cyclesPerFrame':     0x01,
   'name':               0x02,
@@ -354,7 +354,7 @@ PROPERTIES = {
   'fontData':           0x0C
 };
 
-KEYS = {
+KEY = {
   'up':     0x00,
   'down':   0x01,
   'left':   0x02,
@@ -373,8 +373,8 @@ SCREEN_ORIENTATION = {
 module.exports = {
   pack,
   unpack,
-  PLATFORMS,
-  PROPERTIES,
-  KEYS,
+  PLATFORM,
+  PROPERTY,
+  KEY,
   SCREEN_ORIENTATION
 };
