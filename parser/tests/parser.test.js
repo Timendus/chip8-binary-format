@@ -26,6 +26,21 @@ function value(val, numBytes) {
     bytes.push(val >> i*8 & 0xFF);
   return bytes;
 }
+function expectMapping({ description, binary, properties, rom, verbose }) {
+  describe(description, () => {
+    test('packing', () => {
+      if (verbose) console.log('Packing this', properties, 'into this', binary);
+      expect(cbf.pack({ bytecode: rom || bytecode, properties })).toEqual(binary);
+    });
+    test('unpacking', () => {
+      if (verbose) console.log('Unpacking this', binary, 'as this', properties);
+      const unpacked = cbf.unpack(binary);
+      if (verbose) console.log('with this result', unpacked);
+      expect(unpacked.properties).toMatchObject(properties);
+      expect(unpacked.bytecode).toEqual(rom || bytecode);
+    });
+  });
+}
 
 describe('end to end', () => {
 
@@ -48,16 +63,28 @@ describe('end to end', () => {
 
 });
 
-describe('header, name and general structure', () => {
+expectMapping({
+  description: 'empty file',
 
-  const emptyFile = new Uint8Array([
+  binary: new Uint8Array([
     ...strToBytes('CBF'),
     cbf.PLATFORM['CHIP-8'],
     ...address(7),
-    0
-  ]);
+    cbf.PROPERTY.termination
+  ]),
 
-  const contentFile = new Uint8Array([
+  properties: {
+    platform: 0,
+    platformName: 'CHIP-8'
+  },
+
+  rom: new Uint8Array([])
+});
+
+expectMapping({
+  description: 'name',
+
+  binary: new Uint8Array([
     ...strToBytes('CBF'),
     cbf.PLATFORM['XO-CHIP'],
     ...address(15),
@@ -65,46 +92,19 @@ describe('header, name and general structure', () => {
     cbf.PROPERTY.termination,
     4, ...strToBytes('Test'),
     ...bytecode
-  ]);
+  ]),
 
-  test('pack empty file', () => {
-    expect(cbf.pack({
-      properties: {},
-      bytecode: []
-    })).toEqual(emptyFile);
-  });
+  properties: {
+    platform: cbf.PLATFORM['XO-CHIP'],
+    platformName: 'XO-CHIP',
+    name: 'Test'
+  }
+})
 
-  test('pack file with contents', () => {
-    expect(cbf.pack({ bytecode, properties: {
-      platform: 'XO-CHIP',
-      name: 'Test'
-    }})).toEqual(contentFile);
-  });
+expectMapping({
+  description: 'description',
 
-  test('unpack empty file', () => {
-    const unpacked = cbf.unpack(emptyFile);
-    expect(unpacked.properties).toEqual({
-      platform: 0,
-      platformName: 'CHIP-8'
-    });
-    expect(unpacked.bytecode).toEqual(new Uint8Array(0));
-  });
-
-  test('unpack file with contents', () => {
-    const unpacked = cbf.unpack(contentFile);
-    expect(unpacked.properties).toEqual({
-      platform: cbf.PLATFORM['XO-CHIP'],
-      platformName: 'XO-CHIP',
-      name: 'Test'
-    });
-    expect(unpacked.bytecode).toEqual(bytecode);
-  });
-
-});
-
-describe('description', () => {
-
-  const file = new Uint8Array([
+  binary: new Uint8Array([
     ...strToBytes('CBF'),
     cbf.PLATFORM['CHIP-8'],
     ...address(27),
@@ -112,22 +112,11 @@ describe('description', () => {
     cbf.PROPERTY.termination,
     16, ...strToBytes('Description here'),
     ...bytecode
-  ]);
+  ]),
 
-  test('packing', () => {
-    expect(cbf.pack({ bytecode, properties: {
-      description: 'Description here'
-    }})).toEqual(file);
-  });
-
-  test('unpacking', () => {
-    const unpacked = cbf.unpack(file);
-    expect(unpacked.properties).toMatchObject({
-      description: 'Description here'
-    });
-    expect(unpacked.bytecode).toEqual(bytecode);
-  });
-
+  properties: {
+    description: 'Description here'
+  }
 });
 
 describe('author, authors', () => {
@@ -271,9 +260,10 @@ describe('url, urls', () => {
 
 });
 
-describe('cyclesPerFrame', () => {
+expectMapping({
+  description: 'cyclesPerFrame',
 
-  const file = new Uint8Array([
+  binary: new Uint8Array([
     ...strToBytes('CBF'),
     cbf.PLATFORM['CHIP-8'],
     ...address(10 + 3),
@@ -281,22 +271,11 @@ describe('cyclesPerFrame', () => {
     cbf.PROPERTY.termination,
     ...value(200000, 3),
     ...bytecode
-  ]);
+  ]),
 
-  test('packing', () => {
-    expect(cbf.pack({ bytecode, properties: {
-      cyclesPerFrame: 200000
-    }})).toEqual(file);
-  });
-
-  test('unpacking', () => {
-    const unpacked = cbf.unpack(file);
-    expect(unpacked.properties).toMatchObject({
-      cyclesPerFrame: 200000
-    });
-    expect(unpacked.bytecode).toEqual(bytecode);
-  });
-
+  properties: {
+    cyclesPerFrame: 200000
+  }
 });
 
 describe('releaseDate', () => {
@@ -329,75 +308,52 @@ describe('releaseDate', () => {
 
 });
 
-describe('image', () => {
+const imageData = new Uint8Array([
+  0x80, 0x00, 0x80, 0x50, 0x80, 0x50, 0xE2, 0x52,  // planes x width x height bytes,
+  0x95, 0x55, 0x96, 0x55, 0x93, 0x52, 0x00, 0x00,  // containing the cover art image
+  0xFF, 0xFF, 0x00, 0x00, 0x3B, 0x9E, 0x42, 0x50,
+  0x43, 0x9C, 0x42, 0x50, 0x42, 0x50, 0x3B, 0x90
+]);
 
-  const imageData = new Uint8Array([
-    0x80, 0x00, 0x80, 0x50, 0x80, 0x50, 0xE2, 0x52,  // planes x width x height bytes,
-    0x95, 0x55, 0x96, 0x55, 0x93, 0x52, 0x00, 0x00,  // containing the cover art image
-    0xFF, 0xFF, 0x00, 0x00, 0x3B, 0x9E, 0x42, 0x50,
-    0x43, 0x9C, 0x42, 0x50, 0x42, 0x50, 0x3B, 0x90
-  ]);
+expectMapping({
+  description: 'image',
 
-  const image = [
-    0x01,  // Number of planes
-    0x02,  // Width (in bytes)
-    0x10,  // Height (in pixels)
-    ...imageData
-  ];
-
-  const file = new Uint8Array([
+  binary: new Uint8Array([
     ...strToBytes('CBF'),
     cbf.PLATFORM['CHIP-8'],
     ...address(10 + 35),
     cbf.PROPERTY.image, ...address(10),
     cbf.PROPERTY.termination,
-    ...image,
+    0x01,  // Number of planes
+    0x02,  // Width (in bytes)
+    0x10,  // Height (in pixels)
+    ...imageData,
     ...bytecode
-  ]);
+  ]),
 
-  test('packing', () => {
-    expect(cbf.pack({ bytecode, properties: {
-      image
-    }})).toEqual(file);
-
-    expect(cbf.pack({ bytecode, properties: {
-      image: {
-        width: 2,
-        height: 16,
-        planes: 1,
-        data: imageData
-      }
-    }})).toEqual(file);
-  });
-
-  test('unpacking', () => {
-    const unpacked = cbf.unpack(file);
-    console.log(unpacked.properties);
-    expect(unpacked.properties).toMatchObject({
-      image: {
-        width: 2,
-        height: 16,
-        planes: 1,
-        data: imageData
-      }
-    });
-    expect(unpacked.bytecode).toEqual(bytecode);
-  });
-
+  properties: {
+    image: {
+      width: 2,
+      height: 16,
+      planes: 1,
+      data: imageData
+    }
+  }
 });
 
-describe('keys', () => {
+const keymap = {
+  'up': 5,
+  'down': 8,
+  'left': 7,
+  'right': 9,
+  'a': 6,
+  'b': 4
+};
 
-  const keymap = {
-    'up': 5,
-    'down': 8,
-    'left': 7,
-    'right': 9,
-    'a': 6,
-    'b': 4
-  };
+expectMapping({
+  description: 'keys',
 
-  const file = new Uint8Array([
+  binary: new Uint8Array([
     ...strToBytes('CBF'),
     cbf.PLATFORM['CHIP-8'],
     ...address(10 + 13),
@@ -406,32 +362,22 @@ describe('keys', () => {
     Object.keys(keymap).length,
     ...Object.keys(keymap).map(key => [cbf.KEY[key], keymap[key]]).flat(),
     ...bytecode
-  ]);
+  ]),
 
-  test('packing', () => {
-    expect(cbf.pack({ bytecode, properties: {
-      keys: keymap
-    }})).toEqual(file);
-  });
-
-  test('unpacking', () => {
-    const unpacked = cbf.unpack(file);
-    expect(unpacked.properties).toMatchObject({
-      keys: keymap
-    });
-    expect(unpacked.bytecode).toEqual(bytecode);
-  });
-
+  properties: {
+    keys: keymap
+  }
 });
 
-describe('colours', () => {
+const colours = [
+  [ 0x15, 0x64, 0x11 ],  // Dark green for the value 0
+  [ 0x9a, 0xf6, 0x95 ]   // Light green for the value 1
+];
 
-  const colours = [
-    [ 0x15, 0x64, 0x11 ],  // Dark green for the value 0
-    [ 0x9a, 0xf6, 0x95 ]   // Light green for the value 1
-  ];
+expectMapping({
+  description: 'colours',
 
-  const file = new Uint8Array([
+  binary: new Uint8Array([
     ...strToBytes('CBF'),
     cbf.PLATFORM['CHIP-8'],
     ...address(10 + 7),
@@ -439,32 +385,22 @@ describe('colours', () => {
     cbf.PROPERTY.termination,
     colours.length, ...colours.flat(),
     ...bytecode
-  ]);
+  ]),
 
-  test('packing', () => {
-    expect(cbf.pack({ bytecode, properties: {
-      colours: colours
-    }})).toEqual(file);
-  });
-
-  test('unpacking', () => {
-    const unpacked = cbf.unpack(file);
-    expect(unpacked.properties).toMatchObject({
-      colours: colours
-    });
-    expect(unpacked.bytecode).toEqual(bytecode);
-  });
-
+  properties: {
+    colours: colours
+  }
 });
 
-describe('compatibility', () => {
+const compatibility = [
+  cbf.PLATFORM['XO-CHIP'],
+  cbf.PLATFORM['CHIP-8 for ETI-660']
+];
 
-  const compatibility = [
-    cbf.PLATFORM['XO-CHIP'],
-    cbf.PLATFORM['CHIP-8 for ETI-660']
-  ];
+expectMapping({
+  description: 'compatibility',
 
-  const file = new Uint8Array([
+  binary: new Uint8Array([
     ...strToBytes('CBF'),
     cbf.PLATFORM['CHIP-8'],
     ...address(10 + 3),
@@ -472,27 +408,17 @@ describe('compatibility', () => {
     cbf.PROPERTY.termination,
     compatibility.length, ...compatibility,
     ...bytecode
-  ]);
+  ]),
 
-  test('packing', () => {
-    expect(cbf.pack({ bytecode, properties: {
-      compatibleWith: compatibility
-    }})).toEqual(file);
-  });
-
-  test('unpacking', () => {
-    const unpacked = cbf.unpack(file);
-    expect(unpacked.properties).toMatchObject({
-      compatibleWith: compatibility
-    });
-    expect(unpacked.bytecode).toEqual(bytecode);
-  });
-
+  properties: {
+    compatibleWith: compatibility
+  }
 });
 
-describe('screen orientation', () => {
+expectMapping({
+  description: 'screen orientation',
 
-  const file = new Uint8Array([
+  binary: new Uint8Array([
     ...strToBytes('CBF'),
     cbf.PLATFORM['CHIP-8'],
     ...address(10 + 1),
@@ -500,29 +426,19 @@ describe('screen orientation', () => {
     cbf.PROPERTY.termination,
     cbf.SCREEN_ORIENTATION.right,
     ...bytecode
-  ]);
+  ]),
 
-  test('packing', () => {
-    expect(cbf.pack({ bytecode, properties: {
-      screenOrientation: 'right'
-    }})).toEqual(file);
-  });
-
-  test('unpacking', () => {
-    const unpacked = cbf.unpack(file);
-    expect(unpacked.properties).toMatchObject({
-      screenOrientation: 'right'
-    });
-    expect(unpacked.bytecode).toEqual(bytecode);
-  });
-
+  properties: {
+    screenOrientation: 'right'
+  }
 });
 
-describe('font data', () => {
+const font = new Uint8Array([ 1, 2, 3, 4, 5 ]);
 
-  const font = new Uint8Array([ 1, 2, 3, 4, 5 ]);
+expectMapping({
+  description: 'font data',
 
-  const file = new Uint8Array([
+  binary: new Uint8Array([
     ...strToBytes('CBF'),
     cbf.PLATFORM['CHIP-8'],
     ...address(10 + 8),
@@ -531,26 +447,12 @@ describe('font data', () => {
     0x01, 0x00,  // Load to address 0x100
     font.length, ...font,
     ...bytecode
-  ]);
+  ]),
 
-  test('packing', () => {
-    expect(cbf.pack({ bytecode, properties: {
-      fontData: {
-        address: 0x100,
-        data: font
-      }
-    }})).toEqual(file);
-  });
-
-  test('unpacking', () => {
-    const unpacked = cbf.unpack(file);
-    expect(unpacked.properties).toMatchObject({
-      fontData: {
-        address: 0x100,
-        data: font
-      }
-    });
-    expect(unpacked.bytecode).toEqual(bytecode);
-  });
-
+  properties: {
+    fontData: {
+      address: 0x100,
+      data: font
+    }
+  }
 });
