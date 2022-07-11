@@ -62,10 +62,11 @@ window.addEventListener('DOMContentLoaded', () => {
   const compatibilitySelect = document.querySelector('#compatibility-select');
   const platformSlimSelect = new SlimSelect({ select: '#platform-select' });
   let compatibilitySlimSelect = new SlimSelect({ select: '#compatibility-select' });
+  new SlimSelect({ select: '#screen-orientation-select' });
 
   // Add all platforms to the selects
-  const platformsList = Object.keys(parser.PLATFORMS).map(key =>
-          `<option value='${parser.PLATFORMS[key]}'>${key}</option>`);
+  const platformsList = Object.keys(parser.PLATFORM).map(key =>
+          `<option value='${parser.PLATFORM[key]}'>${key}</option>`);
 
   platformSelect.innerHTML = platformsList;
   compatibilitySelect.innerHTML = platformsList;
@@ -84,6 +85,28 @@ window.addEventListener('DOMContentLoaded', () => {
     compatibilitySlimSelect.destroy();
     compatibilitySlimSelect = new SlimSelect({ select: '#compatibility-select' });
   }
+
+  // Allow multiple authors, urls and colours
+  document.querySelector('#authors button').addEventListener('click', e => {
+    e.preventDefault();
+    const li = document.createElement('li');
+    li.innerHTML = `<input type="text" name="authors[]" placeholder="Enter value"/>`;
+    document.querySelector('#authors ul').insertBefore(li, document.querySelector('#authors li.add'));
+    li.querySelector('input').focus();
+  });
+  document.querySelector('#urls button').addEventListener('click', e => {
+    e.preventDefault();
+    const li = document.createElement('li');
+    li.innerHTML = `<input type="text" name="urls[]" placeholder="Enter value"/>`;
+    document.querySelector('#urls ul').insertBefore(li, document.querySelector('#urls li.add'));
+    li.querySelector('input').focus();
+  });
+  document.querySelector('#colours button').addEventListener('click', e => {
+    e.preventDefault();
+    const li = document.createElement('li');
+    li.innerHTML = `<code>01</code> - <input type="color" name="colours[]"/>`;
+    document.querySelector('#colours ul').insertBefore(li, document.querySelector('#colours li.add'));
+  });
 });
 
 function goToFileProperties(header, text, wrap, properties) {
@@ -95,7 +118,9 @@ function goToFileProperties(header, text, wrap, properties) {
   if ( properties ) {
     document.querySelector('select[name="platform"]').value = properties.platform || 0;
     document.querySelector('input[name="name"]').value = properties.name || '';
-    document.querySelector('input[name="author"]').value = properties.author || '';
+    document.querySelector('input[name="authors[]"]').value = properties.authors.join(', ') || '';
+    document.querySelector('input[name="urls[]"]').value = properties.urls.join(', ') || '';
+    document.querySelector('input[name="releaseDate"]').value = properties.releaseDate || new Date();
     document.querySelector('textarea[name="description"]').value = properties.description || '';
   }
 

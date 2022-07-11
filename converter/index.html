@@ -25,27 +25,110 @@
             <div class="field">
               <h2>Target platform(s)</h2>
               <label>
-                The platform this ROM was developed for:
+                The platform this ROM was developed for: (This is the only required field)
                 <select name="platform" id="platform-select"></select>
               </label>
               <label>
                 Other platforms that this ROM can run on without issues, if any:
                 <select name="compatibility" multiple="multiple" id="compatibility-select"></select>
               </label>
+              <label>
+                Execution speed in cycles per frame:
+                <input name="cyclesPerFrame" placeholder="Enter value"/>
+              </label>
+            </div>
+            <div class="field">
+              <h2>Keypad configuration</h2>
+              <p>
+                Which keys on the CHIP-8 hexadecimal keypad (0-15) should be
+                pressed when the following keys are used?
+              </p>
+              <label class="compact">
+                Up key:
+                <input type="number" min="0" max="15" name="" value="" placeholder="Enter a value from 0 to 15"/>
+              </label>
+              <label class="compact">
+                Down key:
+                <input type="number" min="0" max="15" name="" value="" placeholder="Enter a value from 0 to 15"/>
+              </label>
+              <label class="compact">
+                Left key:
+                <input type="number" min="0" max="15" name="" value="" placeholder="Enter a value from 0 to 15"/>
+              </label>
+              <label class="compact">
+                Right key:
+                <input type="number" min="0" max="15" name="" value="" placeholder="Enter a value from 0 to 15"/>
+              </label>
+              <label class="compact">
+                A key:
+                <input type="number" min="0" max="15" name="" value="" placeholder="Enter a value from 0 to 15"/>
+              </label>
+              <label class="compact">
+                B key:
+                <input type="number" min="0" max="15" name="" value="" placeholder="Enter a value from 0 to 15"/>
+              </label>
             </div>
             <div class="field">
               <h2>About the program</h2>
-              <label>
-                Program name:
+              <label class="compact">
+                Name:
                 <input type="text" name="name" placeholder="Enter value"/>
               </label>
-              <label>
-                Author name:
-                <input type="text" name="author" placeholder="Enter value"/>
+              <label class="compact">
+                Release date:
+                <input type="date" name="releaseDate"/>
               </label>
               <label>
                 Description:
                 <textarea name="description" rows="6"></textarea>
+              </label>
+              <label id="authors">
+                Author(s):
+                <ul class="multi-string">
+                  <li><input type="text" name="authors[]" placeholder="Enter value"/></li>
+                  <li class="add"><button class="compact">Add another</button></li>
+                </ul>
+              </label>
+              <label id="urls">
+                URL(s):
+                <ul class="multi-string">
+                  <li><input type="text" name="urls[]" placeholder="Enter value"/></li>
+                  <li class="add"><button class="compact">Add another</button></li>
+                </ul>
+              </label>
+            </div>
+            <div class="field">
+              <h2>Graphics</h2>
+              <label>
+                Screen orientation:
+                <select name="screenOrientation" id="screen-orientation-select">
+                  <option value="0" selected>Display is on its feet, top is up</option>
+                  <option value="1">Display is put on its right side, left side is up</option>
+                  <option value="2">Display is put on its left side, right side is up</option>
+                  <option value="3">Display is upside down, bottom is up</option>
+                </select>
+              </label>
+              <label id="colours">
+                Colour palette:
+                <ul class="colours">
+                  <li><code>0</code> - <input type="color" name="colours[]"/></li>
+                  <li><code>1</code> - <input type="color" name="colours[]"/></li>
+                  <li class="add"><button class="compact">Add a plane</button></li>
+                </ul>
+              </label>
+              <label>
+                Cover art:
+              </label>
+            </div>
+            <div class="field">
+              <h2>Other settings</h2>
+              <label>
+                Font data:
+                <textarea name="fontData" rows="6" placeholder="An array of bytes, holding the font to use"></textarea>
+              </label>
+              <label>
+                Tool vanity:
+                <input type="text" name="toolVanity" value="" placeholder="A short text left by the tool used to create this file"/>
               </label>
             </div>
           </form>
