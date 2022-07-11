@@ -456,3 +456,21 @@ expectMapping({
     }
   }
 });
+
+expectMapping({
+  description: 'tool vanity',
+
+  binary: new Uint8Array([
+    ...strToBytes('CBF'),
+    cbf.PLATFORM['CHIP-8'],
+    ...address(10 + 32),
+    cbf.PROPERTY.toolVanity, ...address(10),
+    cbf.PROPERTY.termination,
+    ...strToBytes('File created by AwesomeChip2000'), 0,
+    ...bytecode
+  ]),
+
+  properties: {
+    toolVanity: 'File created by AwesomeChip2000'
+  }
+});

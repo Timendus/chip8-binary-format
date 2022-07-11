@@ -104,6 +104,9 @@ function readProperties(binary) {
           data: binary.slice(pointer+3, pointer+3+binary[pointer+2])
         };
         break;
+      case PROPERTY.toolVanity:
+        properties['toolVanity'] = bytesToStr(binary.slice(pointer, pointer + findLength(binary, pointer)));
+        break;
     }
   } while ( type != PROPERTY.termination )
   return properties;
@@ -183,6 +186,10 @@ function makeProperties(props, errors) {
           ...intToBytes(props[k].data.length, 1),
           ...props[k].data
         ]);
+        break;
+      case 'toolVanity':
+        table.push(PROPERTY.toolVanity);
+        data.push(stringProperty(props[k], k, errors));
         break;
     }
   });
@@ -353,7 +360,8 @@ PROPERTY = {
   'colours':            0x09,
   'compatibleWith':     0x0A,
   'screenOrientation':  0x0B,
-  'fontData':           0x0C
+  'fontData':           0x0C,
+  'toolVanity':         0x0D
 };
 
 KEY = {
