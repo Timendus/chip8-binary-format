@@ -52,11 +52,12 @@ format.
   * Variable size file header, consisting of:
     * Bytes 0-2: [A magic number](#bytes-0-2-magic-number) to indicate that the file is in
       fact a CBF file
-    * Byte 3: [A platform indicator](#byte-3-platform), containing the primary
+    * Byte 3: [A file format version](#byte-3-cbf-format-version)
+    * Byte 4: [A platform indicator](#byte-4-platform), containing the primary
       platform the ROM is intended for
-    * Bytes 4 and 5: A pointer to [the start of the bytecode
-      segment](#bytes-4-5-pointer-to-bytecode-segment)
-    * Byte 6 and on: [A table](#byte-6-and-on-properties-table) with pointers to optional
+    * Bytes 5 and 6: A pointer to [the start of the bytecode
+      segment](#bytes-5-6-pointer-to-bytecode-segment)
+    * Byte 7 and on: [A table](#byte-7-and-on-properties-table) with pointers to optional
       properties
   * [Data segment](#data-segment) that holds the properties, if any are present
   * Bytecode segment that holds the actual CHIP-8 binary
@@ -66,6 +67,8 @@ This is the absolute minimum content that the header can have:
 ```python
 # Magic header
 0x43 0x42 0x46
+# Version number
+0x01
 # Target platform, here CHIP-8
 0x00
 # Pointer to bytecode segment
@@ -86,7 +89,9 @@ if you have a need for them.
 When using CHIP-8 binary format to pack your CHIP-8 ROMs, likewise you only need
 to add this minimal header to your file, specifying the target platform your ROM
 was intended for. If you want, you can add more information to the file as you
-see fit.
+see fit. The easiest way to convert your ROM to CBF it through the [web based
+file converter](https://timendus.github.io/chip8-binary-format/) (which is under
+construction as much as this spec 🙂).
 
 ## Header
 
@@ -95,11 +100,29 @@ see fit.
 To easily recognize that this is a CHIP-8 binary format file, the file starts
 with the characters 'CBF' in ASCII:
 
-```
+```python
 0x43 0x42 0x46
 ```
 
-### Byte 3: Platform
+### Byte 3: CBF format version
+
+To allow future redesigns of this file format, the next byte contains an integer
+specifying the version of the format used to store this file. Since this is the
+first (and so far only) version of the format, this value must, for now, be `1`.
+
+```python
+0x01
+```
+
+If you encounter a value other than `1`, you should treat it as an unsupported
+file. The easiest way to do that is to combine it with the magic number above,
+and check if the file starts with these bytes before proceeding to parse it:
+
+```python
+0x43 0x42 0x46 0x01
+```
+
+### Byte 4: Platform
 
 The next byte of the header indicates the platform that the ROM targets: one of
 the values from the list below.
@@ -171,7 +194,7 @@ Note however, that you may want to check if the file contains a [compatibility
 configuration](#0x0a-compatibility-configuration) before rejecting the file
 entirely.
 
-### Bytes 4-5: Pointer to bytecode segment
+### Bytes 5-6: Pointer to bytecode segment
 
 The next two bytes are the offset within the file to where the actual CHIP-8
 bytecode starts, counted from the start of the file. Interpreters are expected
@@ -182,7 +205,7 @@ The offset is saved as big endian, just like CHIP-8 uses itself. Since this is a
 two-byte number, the CBF header plus the property data segment can be no larger
 than 65534 bytes.
 
-### Byte 6 and on: Properties table
+### Byte 7 and on: Properties table
 
 After the pointer to the bytecode segment, the properties table starts. It
 contains **at least** the termination item, but can contain one of each of the
@@ -222,7 +245,8 @@ file.
 * `0x0B` - Pointer to [screen orientation](#0x0b-screen-orientation)
 * `0x0C` - Pointer to [font data](#0x0c-font-data)
 * `0x0D` - Pointer to [tool vanity](#0x0d-tool-vanity)
-* `0x0E - 0x7F` - Range reserved for future community standardisation
+* `0x0E` - Pointer to [license information](#0x0e-license-information)
+* `0x0F - 0x7F` - Range reserved for future community standardisation
 * `0x80 - 0xFF` - Range free for personal use of your interpreter specific needs
 
 ## Data segment
@@ -268,18 +292,27 @@ An ASCII string containing the name of the program, terminated by a zero.
 
 ### `0x03` Program description
 
-An ASCII string containing a description of the program, terminated by a zero.
+An ASCII text containing a description of the program, terminated by a zero. The
+text is formatted as [Markdown](https://www.markdownguide.org/basic-syntax/),
+and may be presented as either formatted Markdown or plain text to the user.
+Embedded HTML in the Markdown is not supported and should not be parsed as HTML.
 
 #### Example
 
 ```python
-0x41 0x20 0x67 0x61 0x6d 0x65 0x20  # "A game for two, each controlling a paddle"
-0x66 0x6f 0x72 0x20 0x74 0x77 0x6f
-0x2c 0x20 0x65 0x61 0x63 0x68 0x20
-0x63 0x6f 0x6e 0x74 0x72 0x6f 0x6c
-0x6c 0x69 0x6e 0x67 0x20 0x61 0x20
-0x70 0x61 0x64 0x64 0x6c 0x65
-0x00                                # End of string
+0x23 0x20 0x50 0x6f 0x6e 0x67 0x21 0x0a 0x0a  # "# Pong!
+0x41 0x20 0x67 0x61 0x6d 0x65 0x20 0x66 0x6f  #
+0x72 0x20 0x74 0x77 0x6f 0x2c 0x20 0x65 0x61  #  A game for two, each controlling a paddle. Features:
+0x63 0x68 0x20 0x63 0x6f 0x6e 0x74 0x72 0x6f  #   * A Real Time bouncing ball
+0x6c 0x6c 0x69 0x6e 0x67 0x20 0x61 0x20 0x70  #   * Score keeping"
+0x61 0x64 0x64 0x6c 0x65 0x2e 0x20 0x46 0x65
+0x61 0x74 0x75 0x72 0x65 0x73 0x3a 0x0a 0x20
+0x2a 0x20 0x41 0x20 0x52 0x65 0x61 0x6c 0x20
+0x54 0x69 0x6d 0x65 0x20 0x62 0x6f 0x75 0x6e
+0x63 0x69 0x6e 0x67 0x20 0x62 0x61 0x6c 0x6c
+0x0a 0x20 0x2a 0x20 0x53 0x63 0x6f 0x72 0x65
+0x20 0x6b 0x65 0x65 0x70 0x69 0x6e 0x67
+0x00                                          # End of string
 ```
 
 ### `0x04` Program author
@@ -503,5 +536,20 @@ Please don't pollute the other fields with nonsense 😄
 0x79 0x20 0x41 0x77 0x65 0x73 0x6f
 0x6d 0x65 0x43 0x68 0x69 0x70 0x32
 0x30 0x30 0x30
+0x00                                # End of string
+```
+
+### `0x0E` - License information
+
+An ASCII string describing the copyright license that applies to this program,
+terminated by a zero. Preferably an [SPDX license
+expression](https://spdx.org/licenses/), but free form text is also allowed.
+
+#### Example
+
+```python
+0x4c 0x47 0x50 0x4c 0x2d 0x32 0x2e  # "LGPL-2.1-only OR MIT"
+0x31 0x2d 0x6f 0x6e 0x6c 0x79 0x20
+0x4f 0x52 0x20 0x4d 0x49 0x54
 0x00                                # End of string
 ```
