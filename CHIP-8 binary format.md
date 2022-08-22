@@ -1,10 +1,11 @@
 # CHIP-8 binary format
 
-_A file format for CHIP-8 ROMs that can hold interpreter settings and other
-meta-data._
+_A file format for CHIP-8 programs that can hold multiple ROMs, interpreter
+settings and other meta-data._
 
-**This project is under development, and this spec is not yet finished. It will
-probably undergo changes in the future.**
+**Be warned: This spec may undergo changes while it is at version zero. Feel
+free to implement it, but don't be surprised when things change until we
+release the first official format: version one.**
 
 Over the years there have been countless extensions to CHIP-8; adding colour,
 input devices, more advanced sound capabilities or just errors in the
@@ -49,49 +50,59 @@ format.
 
 ## General structure
 
-  * Variable size file header, consisting of:
+  * A six byte file header, consisting of:
     * Bytes 0-2: [A magic number](#bytes-0-2-magic-number) to indicate that the file is in
       fact a CBF file
-    * Byte 3: [A file format version](#byte-3-cbf-format-version)
-    * Byte 4: [A platform indicator](#byte-4-platform), containing the primary
-      platform the ROM is intended for
-    * Bytes 5 and 6: A pointer to [the start of the bytecode
-      segment](#bytes-5-6-pointer-to-bytecode-segment)
-    * Byte 7 and on: [A table](#byte-7-and-on-properties-table) with pointers to optional
-      properties
-  * [Data segment](#data-segment) that holds the properties, if any are present
-  * Bytecode segment that holds the actual CHIP-8 binary
+    * Byte 3: [The file format version](#byte-3-cbf-format-version)
+    * Byte 4: [A pointer to the bytecode table](#byte-4-pointer-to-bytecode-table)
+    * Byte 5: [A pointer to the properties table](#byte-5-pointer-to-properties-table)
+  * The variable size [table segment](#table-segment), holding the bytecode
+    table and properties table
+  * The variable size [data segment](#data-segment), that holds the properties
+    (if any are present) and the bytecode (the actual CHIP-8 binary)
 
-This is the absolute minimum content that the header can have:
+This is the absolute minimum content that a file can have:
 
 ```python
-# Magic header
+## Header
+
+# Magic number
 0x43 0x42 0x46
 # Version number
-0x01
-# Target platform, here CHIP-8
-0x00
-# Pointer to bytecode segment
-0x00 0x07
-# Empty properties table
 0x00
 
-# CHIP-8 binary data starting from here...
+# Pointer to bytecode table
+0x06
+# Pointer to properties table
+0x00 # Zero means none present
+
+## Tables
+
+# Bytecode table with a single entry
+0x01   0x00 0x0C   0x00 0x10   # CHIP-8 bytecode from 0x000C for 16 bytes
+0x00   # End of bytecode table
+
+## Data segment
+
+# CHIP-8 bytecode data starting from here, at offset 0x000C
 0xe0 0x00 0x0a 0x60 0x0a 0xa2 0x06 0xd0
 0x08 0x12 0x80 0x82 0x8a 0xf2 0x8a 0x8a
 ```
 
-As you can see, to implement CHIP-8 binary format in your interpreter, you only
-really need to parse the first six bytes. Everything else is totally optional to
-implement. You can add support for items from the properties table at any time
+As you can see, implementing CHIP-8 binary format in your interpreter is quite
+simple. You parse the six byte header, which tells you if you can parse the file
+and where to look for the bytecode table. Then you check out the bytecode table
+to see if there is a bytecode in there for a platform that your interpreter
+supports. Everything else is totally optional to implement. But there can be a
+ton of things in the properties table that you can add support for at any time
 if you have a need for them.
 
 When using CHIP-8 binary format to pack your CHIP-8 ROMs, likewise you only need
-to add this minimal header to your file, specifying the target platform your ROM
-was intended for. If you want, you can add more information to the file as you
-see fit. The easiest way to convert your ROM to CBF it through the [web based
-file converter](https://timendus.github.io/chip8-binary-format/) (which is under
-construction as much as this spec 🙂).
+to add this minimal structure to your file, specifying the target platform your
+ROM was intended for. If you want, you can add more information to the file as
+you see fit. The easiest way to convert your ROM to CBF it through the [web
+based file converter](https://timendus.github.io/chip8-binary-format/) (which is
+under construction as much as this spec 🙂).
 
 ## Header
 
@@ -107,109 +118,156 @@ with the characters 'CBF' in ASCII:
 ### Byte 3: CBF format version
 
 To allow future redesigns of this file format, the next byte contains an integer
-specifying the version of the format used to store this file. Since this is the
-first (and so far only) version of the format, this value must, for now, be `1`.
+specifying the version of the format used to store this file. It is currently at
+version `0`, which is the "pre-release" version that may change at any time. We
+will bind a fixed specification to a version starting from version 1.
 
 ```python
-0x01
+0x00
 ```
 
-If you encounter a value other than `1`, you should treat it as an unsupported
-file. The easiest way to do that is to combine it with the magic number above,
-and check if the file starts with these bytes before proceeding to parse it:
+If you encounter an unsupported version number, you should treat it as an
+unsupported file. The easiest way to do that is to combine it with the magic
+number above, and check if the file starts with these bytes before proceeding to
+parse it:
 
 ```python
-0x43 0x42 0x46 0x01
+0x43 0x42 0x46 0x00
 ```
 
-### Byte 4: Platform
+### Byte 4: Pointer to bytecode table
 
-The next byte of the header indicates the platform that the ROM targets: one of
-the values from the list below.
+The fifth byte is the offset from the start of the file to where the bytecode
+table starts. If the value is zero, it should be interpreted as "this table
+isn't present in the file".
 
-The list is in semi-chronological order, the differences between the platforms
+### Byte 5: Pointer to properties table
+
+The sixth byte is the offset from the start of the file to where the properties
+table starts. If the value is zero, it should be interpreted as "this table
+isn't present in the file".
+
+## Table segment
+
+The segment immediately after the header contains two fairly similar tables with
+entries that point to other places in the file. These tables basically define
+for the reader what else is in the file.
+
+The table segment needs to come after the header, because the pointers to the
+tables are only a single byte. The tables may be stored in the table segment in
+any order, but it makes sense to put the longest one last because otherwise it
+may not be possible to reference the smaller table by the single byte in the
+header.
+
+### Bytecode table
+
+The bytecode table holds pointers to where the bytecode segments for particular
+platforms are stored in the file, along with their sizes. Each entry in the
+table represents one platform. Multiple entries may point to the same bytecode.
+
+The bytecode table gives you a simple way to either reject a file as not
+supported or configure your interpreter in the correct way to run the file. If
+you find yourself in the luxury position that your interpreter can run several
+different bytecodes that are found in the file, you can leave the choice of
+which one to run up to the user.
+
+An entry in the bytecode table is five bytes:
+
+ * platform (1 byte, see list below)
+ * offset from the start of the file (2 bytes)
+ * size of the bytecode (2 bytes)
+
+The table ends with a one byte item that is just the termination item.
+
+Both the offset and the size are saved as big endian, just like CHIP-8 uses
+itself. The offsets indicate the number of bytes from the start of the file.
+Since these are 16-bit numbers, we can point to anything up to `0xFFFF` (65535)
+bytes into the file, at an entry that can be a maximum of the same number of
+bytes.
+
+#### Example of a bytecode table
+
+```python
+# We have one binary for the original CHIP-8 interpreter
+0x01   0x00 0x1D   0x0C 0x7A   # CHIP-8 bytecode from 0x001D for 0x0C7A (3194) bytes
+# We have a version that's compatible with both versions of SCHIP
+0x2C   0x0C 0x97   0x0D 0xE2   # SCHIP v1.0 bytecode from 0x0C97 for 0x0DE2 (3554) bytes
+0x2D   0x0C 0x97   0x0D 0xE2   # SCHIP v1.1 bytecode from 0x0C97 for 0x0DE2 (3554) bytes
+# And another version of the binary that makes use of XO-CHIP features
+0x34   0x1A 0x79   0x62 0xB8   # XO-CHIP bytecode from 0x1A79 for 0x62B8 (25272) bytes
+# End of bytecode table
+0x00
+```
+
+#### Platforms
+
+This list is in semi-chronological order, the differences between the platforms
 are [documented here](https://chip-8.github.io/extensions). The most common ones
 are highlighted in **bold**.
 
-* `0x00` - **CHIP-8**
-* `0x01` - CHIP-8 1/2
-* `0x02` - CHIP-8I
-* `0x03` - CHIP-8 II aka. Keyboard Kontrol
-* `0x04` - CHIP-8III
-* `0x05` - Two-page display for CHIP-8
-* `0x06` - CHIP-8C
-* `0x07` - CHIP-10
-* `0x08` - CHIP-8 modification for saving and restoring variables
-* `0x09` - Improved CHIP-8 modification for saving and restoring variables
-* `0x0A` - CHIP-8 modification with relative branching
-* `0x0B` - Another CHIP-8 modification with relative branching
-* `0x0C` - CHIP-8 modification with fast, single-dot DXYN
-* `0x0D` - CHIP-8 with I/O port driver routine
-* `0x0E` - CHIP-8 8-bit multiply and divide
-* `0x0F` - HI-RES CHIP-8 (four-page display)
-* `0x10` - HI-RES CHIP-8 with I/O
-* `0x11` - HI-RES CHIP-8 with page switching
-* `0x12` - CHIP-8E
-* `0x13` - CHIP-8 with improved BNNN
-* `0x14` - CHIP-8 scrolling routine
-* `0x15` - CHIP-8X
-* `0x16` - Two-page display for CHIP-8X
-* `0x17` - Hi-res CHIP-8X
-* `0x18` - CHIP-8Y
-* `0x19` - CHIP-8 “Copy to Screen”
-* `0x1A` - CHIP-BETA
-* `0x1B` - CHIP-8M
-* `0x1C` - Multiple Nim interpreter
-* `0x1D` - Double Array Modification
-* `0x1E` - CHIP-8 for DREAM 6800 (CHIPOS)
-* `0x1F` - CHIP-8 with logical operators for DREAM 6800 (CHIPOSLO)
-* `0x20` - CHIP-8 for DREAM 6800 with joystick
-* `0x21` - 2K CHIPOS for DREAM 6800
-* `0x22` - CHIP-8 for ETI-660
-* `0x23` - CHIP-8 with color support for ETI-660
-* `0x24` - CHIP-8 for ETI-660 with high resolution
-* `0x25` - CHIP-8 for COSMAC ELF
-* `0x26` - CHIP-VDU / CHIP-8 for the ACE VDU
-* `0x27` - CHIP-8 AE (ACE Extended)
-* `0x28` - Dreamcards Extended CHIP-8 V2.0
-* `0x29` - Amiga CHIP-8 interpreter
-* `0x2A` - CHIP-48
-* `0x2B` - **SUPER-CHIP 1.0**
-* `0x2C` - **SUPER-CHIP 1.1**
-* `0x2D` - GCHIP
-* `0x2E` - SCHIP Compatibility (SCHPC) and GCHIP Compatibility (GCHPC)
-* `0x2F` - VIP2K CHIP-8
-* `0x30` - SUPER-CHIP with scroll up
-* `0x31` - chip8run
-* `0x32` - Mega-Chip
-* `0x33` - **XO-CHIP**
-* `0x34` - Octo
-* `0x35` - CHIP-8 Classic / Color
+* `0x00` - Termination item, end of bytecode table
+* `0x01` - **CHIP-8**
+* `0x02` - CHIP-8 1/2
+* `0x03` - CHIP-8I
+* `0x04` - CHIP-8 II aka. Keyboard Kontrol
+* `0x05` - CHIP-8III
+* `0x06` - Two-page display for CHIP-8
+* `0x07` - CHIP-8C
+* `0x08` - CHIP-10
+* `0x09` - CHIP-8 modification for saving and restoring variables
+* `0x0A` - Improved CHIP-8 modification for saving and restoring variables
+* `0x0B` - CHIP-8 modification with relative branching
+* `0x0C` - Another CHIP-8 modification with relative branching
+* `0x0D` - CHIP-8 modification with fast, single-dot DXYN
+* `0x0E` - CHIP-8 with I/O port driver routine
+* `0x0F` - CHIP-8 8-bit multiply and divide
+* `0x10` - HI-RES CHIP-8 (four-page display)
+* `0x11` - HI-RES CHIP-8 with I/O
+* `0x12` - HI-RES CHIP-8 with page switching
+* `0x13` - CHIP-8E
+* `0x14` - CHIP-8 with improved BNNN
+* `0x15` - CHIP-8 scrolling routine
+* `0x16` - CHIP-8X
+* `0x17` - Two-page display for CHIP-8X
+* `0x18` - Hi-res CHIP-8X
+* `0x19` - CHIP-8Y
+* `0x1A` - CHIP-8 “Copy to Screen”
+* `0x1B` - CHIP-BETA
+* `0x1C` - CHIP-8M
+* `0x1D` - Multiple Nim interpreter
+* `0x1E` - Double Array Modification
+* `0x1F` - CHIP-8 for DREAM 6800 (CHIPOS)
+* `0x20` - CHIP-8 with logical operators for DREAM 6800 (CHIPOSLO)
+* `0x21` - CHIP-8 for DREAM 6800 with joystick
+* `0x22` - 2K CHIPOS for DREAM 6800
+* `0x23` - CHIP-8 for ETI-660
+* `0x24` - CHIP-8 with color support for ETI-660
+* `0x25` - CHIP-8 for ETI-660 with high resolution
+* `0x26` - CHIP-8 for COSMAC ELF
+* `0x27` - CHIP-VDU / CHIP-8 for the ACE VDU
+* `0x28` - CHIP-8 AE (ACE Extended)
+* `0x29` - Dreamcards Extended CHIP-8 V2.0
+* `0x2A` - Amiga CHIP-8 interpreter
+* `0x2B` - CHIP-48
+* `0x2C` - **SUPER-CHIP 1.0**
+* `0x2D` - **SUPER-CHIP 1.1**
+* `0x2E` - GCHIP
+* `0x2F` - SCHIP Compatibility (SCHPC) and GCHIP Compatibility (GCHPC)
+* `0x30` - VIP2K CHIP-8
+* `0x31` - SUPER-CHIP with scroll up
+* `0x32` - chip8run
+* `0x33` - Mega-Chip
+* `0x34` - **XO-CHIP**
+* `0x35` - Octo
+* `0x36` - CHIP-8 Classic / Color
+* `0x37 - 0xEF` - Range reserved for future community standardisation
+* `0xF0 - 0xFF` - Range free for personal use in your own interpreter
 
-Obviously, your interpreter does not need to support all of these platforms. The
-platform indicator byte gives you a simple way to either reject a file as not
-supported or configure your interpreter in the correct way to run the file.
+### Properties table
 
-Note however, that you may want to check if the file contains a [compatibility
-configuration](#0x0a-compatibility-configuration) before rejecting the file
-entirely.
-
-### Bytes 5-6: Pointer to bytecode segment
-
-The next two bytes are the offset within the file to where the actual CHIP-8
-bytecode starts, counted from the start of the file. Interpreters are expected
-to load everything from this pointer to the end of the file into CHIP-8 memory,
-generally at address 0x200 (depending on platform).
-
-The offset is saved as big endian, just like CHIP-8 uses itself. Since this is a
-two-byte number, the CBF header plus the property data segment can be no larger
-than 65534 bytes.
-
-### Byte 7 and on: Properties table
-
-After the pointer to the bytecode segment, the properties table starts. It
-contains **at least** the termination item, but can contain one of each of the
-types of properties below. Some property types may occur more than once.
+The properties table contains pointers to properties of the file. It can contain
+one of each of the types of properties in the list below. Some property types
+may occur more than once.
 
 Every item in the properties table (except the termination item) is three bytes
 long. The first byte of an item indicates the type, the next two bytes are a
@@ -221,9 +279,9 @@ file.
 
 ```python
 # Properties table
-0x02  0x00 0x10   # Program name can be found at offset 0x10
-0x04  0x00 0x24   # Author name can be found at offset 0x24
-0x0A  0x00 0x36   # Compatibility configuration can be found at offset 0x36
+0x02  0x00 0x36   # Program name can be found at offset 0x0036
+0x04  0x00 0x45   # Author name can be found at offset 0x0045
+0x0E  0x00 0x53   # License information can be found at offset 0x0053
 0x00              # End of properties table
 ```
 
@@ -241,21 +299,32 @@ file.
 * `0x07` - Pointer to [cover art](#0x07-cover-art)
 * `0x08` - Pointer to [key input configuration](#0x08-key-input-configuration)
 * `0x09` - Pointer to [colour configuration](#0x09-colour-configuration)
-* `0x0A` - Pointer to [compatibility configuration](#0x0a-compatibility-configuration)
-* `0x0B` - Pointer to [screen orientation](#0x0b-screen-orientation)
-* `0x0C` - Pointer to [font data](#0x0c-font-data)
-* `0x0D` - Pointer to [tool vanity](#0x0d-tool-vanity)
-* `0x0E` - Pointer to [license information](#0x0e-license-information)
+* `0x0B` - Pointer to [screen orientation](#0x0a-screen-orientation)
+* `0x0C` - Pointer to [font data](#0x0b-font-data)
+* `0x0D` - Pointer to [tool vanity](#0x0c-tool-vanity)
+* `0x0E` - Pointer to [license information](#0x0d-license-information)
 * `0x0F - 0x7F` - Range reserved for future community standardisation
 * `0x80 - 0xFF` - Range free for personal use of your interpreter specific needs
 
 ## Data segment
 
-After the header, the data segment starts, where the data resides for each of
-the properties present in the properties table. There does not have to be any
-particular order in which these data structures are laid out in memory, nor any
-padding or alignment, since the properties table gives us direct pointers to the
-start of each data structure.
+After the table segment, the data segment starts, where the data resides for
+each of the properties present in the properties table and all the bytecode in
+the bytecode table.
+
+There does not have to be any particular order in which these data structures
+are laid out in memory, nor any padding or alignment, since the tables give us
+direct pointers to the start of each data structure. However, when creating the
+file, it makes sense to sort the segments by size, so the largest segment ends
+up at the end. If there is more data to store than can be addressed in 16 bits,
+this will increase the chance that all of that data can still be stored in one
+CHIP-8 binary file.
+
+### Bytecode
+
+Bytecode segments in the file are simply that: the raw, unmodified, uncompressed
+bytecode that a variant of a CHIP-8 interpreter can run. These segments are
+basically the contents of the old `.ch8` files.
 
 ### `0x01` Desired execution speed
 
@@ -413,9 +482,10 @@ The values may be used in any order and can be used multiple times to have the
 given button trigger multiple CHIP-8 keys.
 
 Some platforms support two hexadecimal keypads, in which case the most
-significant nibble can be used to indicate that the key maps to the second
-keypad. Some platforms support an actual full size keyboard or other inputs with
-keys. This use has not been specified yet.
+significant nibble of the second byte can be used instead of the least
+significant nibble to indicate that the key maps to the second keypad. Some
+platforms support an actual full size keyboard or other inputs with keys. This
+use has not been specified yet.
 
 #### Example
 
@@ -464,32 +534,7 @@ on the last plane (01), then the colour for only a bit set on the first plane
 0x66 0x22 0x00  # 'Blended' colour for 1 in plane 0 and 1 in plane 1      (11)
 ```
 
-### `0x0A` Compatibility configuration
-
-A list of platforms that this ROM is also compatible with, starting with a
-length byte.
-
-Often a program was written for one platform, for example SUPER-CHIP 1.1, but it
-runs equally well on other platforms, for example CHIP-8 or XO-CHIP, because
-care was taken by the developer to not use any of the platform specific quirks.
-This compatibility list allows the developer to specify which other platforms
-the ROM can also run on without issues.
-
-If the interpreter does not implement the primary [platform](#byte-3-platform)
-that the header indicates the ROM was developed for, the interpreter can check
-this list for other ways to still run this ROM.
-
-There is no need to repeat the primary platform in this list.
-
-#### Example
-
-```python
-0x02  # Read two compatible platforms
-0x00  # CHIP-8
-0x33  # XO-CHIP
-```
-
-### `0x0B` Screen orientation
+### `0x0A` Screen orientation
 
 A single byte indicating the desired orientation of the display. Some games are
 written with the premise that the display is "put on its side", so they can make
@@ -506,7 +551,7 @@ use of portrait mode.
 0x01  # Display is put on its right side, left side is up
 ```
 
-### `0x0C` Font data
+### `0x0B` Font data
 
 Binary data that represents a font, starting with the address to load the font
 to and a length byte.
@@ -523,7 +568,7 @@ interpreter. With this data structure, the font can be supplied with the ROM.
 0x20 0x70 0x20 0x10 0xf0 ....
 ```
 
-### `0x0D` Tool vanity
+### `0x0C` Tool vanity
 
 An ASCII string where tooling can leave a vanity text, terminated by a zero.
 Please don't pollute the other fields with nonsense 😄
@@ -539,7 +584,7 @@ Please don't pollute the other fields with nonsense 😄
 0x00                                # End of string
 ```
 
-### `0x0E` - License information
+### `0x0D` - License information
 
 An ASCII string describing the copyright license that applies to this program,
 terminated by a zero. Preferably an [SPDX license
