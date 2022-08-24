@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "description": "A zero-depenencies library to pack and unpack `.c8b` files",
   "files": [
-    "parser.js"
+    "parser.js",
+    "README.md"
   ],
   "scripts": {
     "test": "jest",
