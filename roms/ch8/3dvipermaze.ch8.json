@@ -1,0 +1,22 @@
+{
+  "name": "3D Viper Maze",
+  "author": "Timendus",
+  "url": "https://github.com/Timendus/3d-viper-maze",
+  "description": "3D Viper Maze is an homage to the Sinclair ZX81 game 3D Monster Maze from 1981. This is not a game with an endless supply of randomly generated mazes, however. Instead, it has handcrafted levels with vipers, coins and buttons. Your challenge, if you accept it: to find the exit in each maze, while collecting all the coins, in a series of ever more difficult puzzles.\n\nMove around with UP, DOWN, LEFT and RIGHT. Use A or B to show a map of the maze.",
+  "platforms": ["XO-CHIP"],
+  "colours": [
+    [ 153, 102, 0 ],
+    [ 255, 102, 0 ],
+    [ 255, 204, 0 ],
+    [ 102,  34, 0 ]
+  ],
+  "cyclesPerFrame": 300,
+  "keys": {
+    "up": 5,
+    "down": 8,
+    "left": 7,
+    "right": 9,
+    "a": 1,
+    "b": 1
+  }
+}

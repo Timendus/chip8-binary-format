@@ -1,0 +1,10 @@
+{
+  "name": "IBM logo",
+  "description": "The IBM logo that people have been using to get their CHIP-8 interpreters to run for decades :)",
+  "platforms": [
+    "CHIP-8",
+    "SUPER-CHIP 1.0",
+    "SUPER-CHIP 1.1",
+    "XO-CHIP"
+  ]
+}
