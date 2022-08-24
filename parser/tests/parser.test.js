@@ -1,43 +1,69 @@
 const cbf = require('../parser.js');
 
-const bytecode = new Uint8Array([
-  0x00, 0xe0, 0xa2, 0x2a, 0x60, 0x0c, 0x61, 0x08, 0xd0, 0x1f, 0x70, 0x09,
-  0xa2, 0x39, 0xd0, 0x1f, 0xa2, 0x48, 0x70, 0x08, 0xd0, 0x1f, 0x70, 0x04,
-  0xa2, 0x57, 0xd0, 0x1f, 0x70, 0x08, 0xa2, 0x66, 0xd0, 0x1f, 0x70, 0x08,
-  0xa2, 0x75, 0xd0, 0x1f, 0x12, 0x28, 0xff, 0x00, 0xff, 0x00, 0x3c, 0x00,
-  0x3c, 0x00, 0x3c, 0x00, 0x3c, 0x00, 0xff, 0x00, 0xff, 0xff, 0x00, 0xff,
-  0x00, 0x38, 0x00, 0x3f, 0x00, 0x3f, 0x00, 0x38, 0x00, 0xff, 0x00, 0xff,
-  0x80, 0x00, 0xe0, 0x00, 0xe0, 0x00, 0x80, 0x00, 0x80, 0x00, 0xe0, 0x00,
-  0xe0, 0x00, 0x80, 0xf8, 0x00, 0xfc, 0x00, 0x3e, 0x00, 0x3f, 0x00, 0x3b,
-  0x00, 0x39, 0x00, 0xf8, 0x00, 0xf8, 0x03, 0x00, 0x07, 0x00, 0x0f, 0x00,
-  0xbf, 0x00, 0xfb, 0x00, 0xf3, 0x00, 0xe3, 0x00, 0x43, 0xe0, 0x00, 0xe0,
-  0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0xe0, 0x00, 0xe0
-]);
+const bytecode = [
+  {
+    platforms: [
+      cbf.PLATFORM['CHIP-8'],
+      cbf.PLATFORM['SUPER-CHIP 1.0'],
+      cbf.PLATFORM['SUPER-CHIP 1.1']
+    ],
+    platformNames: [
+      'CHIP-8',
+      'SUPER-CHIP 1.0',
+      'SUPER-CHIP 1.1'
+    ],
+    bytecode: new Uint8Array([
+      0x00, 0xe0, 0xa2, 0x2a, 0x60, 0x0c, 0x61, 0x08, 0xd0, 0x1f, 0x70, 0x09,
+      0xa2, 0x39, 0xd0, 0x1f, 0xa2, 0x48, 0x70, 0x08, 0xd0, 0x1f, 0x70, 0x04,
+      0xa2, 0x57, 0xd0, 0x1f, 0x70, 0x08, 0xa2, 0x66, 0xd0, 0x1f, 0x70, 0x08,
+      0xa2, 0x75, 0xd0, 0x1f, 0x12, 0x28, 0xff, 0x00, 0xff, 0x00, 0x3c, 0x00,
+      0x3c, 0x00, 0x3c, 0x00, 0x3c, 0x00, 0xff, 0x00, 0xff, 0xff, 0x00, 0xff,
+      0x00, 0x38, 0x00, 0x3f, 0x00, 0x3f, 0x00, 0x38, 0x00, 0xff, 0x00, 0xff,
+      0x80, 0x00, 0xe0, 0x00, 0xe0, 0x00, 0x80, 0x00, 0x80, 0x00, 0xe0, 0x00,
+      0xe0, 0x00, 0x80, 0xf8, 0x00, 0xfc, 0x00, 0x3e, 0x00, 0x3f, 0x00, 0x3b,
+      0x00, 0x39, 0x00, 0xf8, 0x00, 0xf8, 0x03, 0x00, 0x07, 0x00, 0x0f, 0x00,
+      0xbf, 0x00, 0xfb, 0x00, 0xf3, 0x00, 0xe3, 0x00, 0x43, 0xe0, 0x00, 0xe0,
+      0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0xe0, 0x00, 0xe0
+    ])
+  }
+];
+
+function version() { return [0]; }
+function address(addr) { return value(addr, 2); }
+function size(size) { return value(size, 2); }
+function tablePointer(addr) { return value(addr, 1); }
+function bytecodeTable(addr) {
+  return [
+    cbf.PLATFORM['CHIP-8'],         ...address(addr), ...size(bytecode[0].bytecode.length),
+    cbf.PLATFORM['SUPER-CHIP 1.0'], ...address(addr), ...size(bytecode[0].bytecode.length),
+    cbf.PLATFORM['SUPER-CHIP 1.1'], ...address(addr), ...size(bytecode[0].bytecode.length),
+    cbf.PLATFORM.termination
+  ];
+}
 
 function strToBytes(str) {
   return new Uint8Array(str.split('').map(c => c.charCodeAt(0) & 0xFF));
 }
-function address(addr) {
-  return value(addr, 2);
-}
+
 function value(val, numBytes) {
   const bytes = [];
   for ( let i = numBytes - 1; i >= 0; i-- )
     bytes.push(val >> i*8 & 0xFF);
   return bytes;
 }
-function expectMapping({ description, binary, properties, rom, verbose }) {
+
+function expectMapping({ description, binary, properties, roms, verbose }) {
   describe(description, () => {
     test('packing', () => {
       if (verbose) console.log('Packing this', properties, 'into this', binary);
-      expect(cbf.pack({ bytecode: rom || bytecode, properties })).toEqual(binary);
+      expect(cbf.pack({ bytecode: roms || bytecode, properties })).toEqual(binary);
     });
     test('unpacking', () => {
       if (verbose) console.log('Unpacking this', binary, 'as this', properties);
       const unpacked = cbf.unpack(binary);
       if (verbose) console.log('with this result', unpacked);
       expect(unpacked.properties).toMatchObject(properties);
-      expect(unpacked.bytecode).toEqual(rom || bytecode);
+      expect(unpacked.bytecode).toEqual(roms || bytecode);
     });
   });
 }
@@ -45,8 +71,6 @@ function expectMapping({ description, binary, properties, rom, verbose }) {
 describe('end to end', () => {
 
   const properties = {
-    platform: 0,
-    platformName: 'CHIP-8',
     name: 'IBM test rom',
     description: 'This ROM is a rite of passage for any CHIP-8 developer'
   };
@@ -68,35 +92,34 @@ expectMapping({
 
   binary: new Uint8Array([
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(7),
-    cbf.PROPERTY.termination
+    version(),
+    ...tablePointer(0), // No bytecode table
+    ...tablePointer(0), // No properties table
   ]),
 
-  properties: {
-    platform: 0,
-    platformName: 'CHIP-8'
-  },
-
-  rom: new Uint8Array([])
+  properties: {},
+  roms: []
 });
 
 expectMapping({
   description: 'name',
 
   binary: new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['XO-CHIP'],
-    ...address(15),
-    cbf.PROPERTY.name, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.name, ...address(26),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(31),
+    // Data
     ...strToBytes('Test'), 0,
-    ...bytecode
+    ...bytecode[0].bytecode
   ]),
 
   properties: {
-    platform: cbf.PLATFORM['XO-CHIP'],
-    platformName: 'XO-CHIP',
     name: 'Test'
   }
 })
@@ -105,13 +128,18 @@ expectMapping({
   description: 'description',
 
   binary: new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(27),
-    cbf.PROPERTY.description, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.description, ...address(26),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(43),
+    // Data
     ...strToBytes('Description here'), 0,
-    ...bytecode
+    ...bytecode[0].bytecode
   ]),
 
   properties: {
@@ -122,25 +150,35 @@ expectMapping({
 describe('author, authors', () => {
 
   const file = new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(10 + 9),
-    cbf.PROPERTY.author, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.author, ...address(26),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(35),
+    // Data
     ...strToBytes('Timendus'), 0,
-    ...bytecode
+    ...bytecode[0].bytecode
   ]);
 
   const multipleFile = new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(13 + 9 + 18),
-    cbf.PROPERTY.author, ...address(13),
-    cbf.PROPERTY.author, ...address(22),
+    ...version(),
+    ...tablePointer(13),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.author, ...address(29),
+    cbf.PROPERTY.author, ...address(38),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(56),
+    // Data
     ...strToBytes('Timendus'), 0,
     ...strToBytes('Joseph Weisbecker'), 0,
-    ...bytecode
+    ...bytecode[0].bytecode
   ]);
 
   test('packing with a single author', () => {
@@ -188,25 +226,35 @@ describe('author, authors', () => {
 describe('url, urls', () => {
 
   const file = new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(10 + 48),
-    cbf.PROPERTY.url, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.url, ...address(26),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(74),
+    // Data
     ...strToBytes('https://github.com/Timendus/chip8-binary-format'), 0,
-    ...bytecode
+    ...bytecode[0].bytecode
   ]);
 
   const multipleFile = new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(13 + 48 + 48),
-    cbf.PROPERTY.url, ...address(13),
-    cbf.PROPERTY.url, ...address(61),
+    ...version(),
+    ...tablePointer(13),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.url, ...address(29),
+    cbf.PROPERTY.url, ...address(77),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(125),
+    // Data
     ...strToBytes('https://github.com/Timendus/chip8-binary-format'), 0,
     ...strToBytes('https://timendus.github.io/chip8-binary-format/'), 0,
-    ...bytecode
+    ...bytecode[0].bytecode
   ]);
 
   test('packing with a single url', () => {
@@ -264,13 +312,18 @@ expectMapping({
   description: 'cyclesPerFrame',
 
   binary: new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(10 + 3),
-    cbf.PROPERTY.cyclesPerFrame, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.cyclesPerFrame, ...address(26),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(29),
+    // Data
     ...value(200000, 3),
-    ...bytecode
+    ...bytecode[0].bytecode
   ]),
 
   properties: {
@@ -283,13 +336,18 @@ describe('releaseDate', () => {
   const date = new Date('2022-07-09 14:43:00');
 
   const file = new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(10 + 4),
-    cbf.PROPERTY.releaseDate, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.releaseDate, ...address(26),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(30),
+    // Data
     ...value(+date/1000, 4),
-    ...bytecode
+    ...bytecode[0].bytecode
   ]);
 
   test('packing', () => {
@@ -319,16 +377,21 @@ expectMapping({
   description: 'image',
 
   binary: new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(10 + 35),
-    cbf.PROPERTY.image, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.image, ...address(26),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(61),
+    // Data
     0x01,  // Number of planes
     0x02,  // Width (in bytes)
     0x10,  // Height (in pixels)
     ...imageData,
-    ...bytecode
+    ...bytecode[0].bytecode
   ]),
 
   properties: {
@@ -354,14 +417,19 @@ expectMapping({
   description: 'keys',
 
   binary: new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(10 + 13),
-    cbf.PROPERTY.keys, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.keys, ...address(26),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(39),
+    // Data
     Object.keys(keymap).length,
     ...Object.keys(keymap).map(key => [cbf.KEY[key], keymap[key]]).flat(),
-    ...bytecode
+    ...bytecode[0].bytecode
   ]),
 
   properties: {
@@ -378,13 +446,19 @@ expectMapping({
   description: 'colours',
 
   binary: new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(10 + 7),
-    cbf.PROPERTY.colours, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.colours, ...address(26),
     cbf.PROPERTY.termination,
-    colours.length, ...colours.flat(),
-    ...bytecode
+    ...bytecodeTable(33),
+    // Data
+    colours.length,
+    ...colours.flat(),
+    ...bytecode[0].bytecode
   ]),
 
   properties: {
@@ -392,44 +466,26 @@ expectMapping({
   }
 });
 
-const compatibility = [
-  cbf.PLATFORM['XO-CHIP'],
-  cbf.PLATFORM['CHIP-8 for ETI-660']
-];
-
-expectMapping({
-  description: 'compatibility',
-
-  binary: new Uint8Array([
-    ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(10 + 3),
-    cbf.PROPERTY.compatibleWith, ...address(10),
-    cbf.PROPERTY.termination,
-    compatibility.length, ...compatibility,
-    ...bytecode
-  ]),
-
-  properties: {
-    compatibleWith: compatibility
-  }
-});
-
 expectMapping({
   description: 'screen orientation',
 
   binary: new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(10 + 1),
-    cbf.PROPERTY.screenOrientation, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.screenOrientation, ...address(26),
     cbf.PROPERTY.termination,
-    cbf.SCREEN_ORIENTATION.right,
-    ...bytecode
+    ...bytecodeTable(27),
+    // Data
+    cbf.SCREEN_ORIENTATION['left side up'],
+    ...bytecode[0].bytecode
   ]),
 
   properties: {
-    screenOrientation: 'right'
+    screenOrientation: 'left side up'
   }
 });
 
@@ -439,14 +495,20 @@ expectMapping({
   description: 'font data',
 
   binary: new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(10 + 8),
-    cbf.PROPERTY.fontData, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.fontData, ...address(26),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(34),
+    // Data
     0x01, 0x00,  // Load to address 0x100
-    font.length, ...font,
-    ...bytecode
+    font.length,
+    ...font,
+    ...bytecode[0].bytecode
   ]),
 
   properties: {
@@ -461,13 +523,18 @@ expectMapping({
   description: 'tool vanity',
 
   binary: new Uint8Array([
+    // Header
     ...strToBytes('CBF'),
-    cbf.PLATFORM['CHIP-8'],
-    ...address(10 + 32),
-    cbf.PROPERTY.toolVanity, ...address(10),
+    ...version(),
+    ...tablePointer(10),
+    ...tablePointer(6),
+    // Tables
+    cbf.PROPERTY.toolVanity, ...address(26),
     cbf.PROPERTY.termination,
+    ...bytecodeTable(58),
+    // Data
     ...strToBytes('File created by AwesomeChip2000'), 0,
-    ...bytecode
+    ...bytecode[0].bytecode
   ]),
 
   properties: {

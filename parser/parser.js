@@ -1,222 +1,210 @@
 /**
- * External API
+ * Encoder
  **/
 
-function pack({ properties, bytecode }) {
-  const errors = [];
-  const binary = join(
-    MAGIC_NUMBER,
-    map(PLATFORM, properties.platform || 0, errors),
-    0, 0,
-    makeProperties(properties, errors)
+function pack({ properties, bytecode, verbose }) {
+  resetErrors();
+
+  const [bytecodeTable, bytecodeData] = encodeBytecode(bytecode);
+  const [propertiesTable, propertiesData] = encodeProperties(properties);
+
+  const file = [
+    header(),
+    ...[...bytecodeTable, ...propertiesTable].sort(bySize),
+    ...[...bytecodeData, ...propertiesData].sort(bySize)
+  ];
+  file.forEach(entry =>
+    entry.encoded = entry.encode(file)
   );
 
-  assert(errors.length == 0, errors);
-  assert(binary.length <= 0xFFFF, ['Size of header and data segment should fit in 16 bits']);
+  if ( verbose )
+    console.log(file);
 
-  binary[4] = binary.length >> 8 & 0xFF;  // Set pointer to bytecode in header
-  binary[5] = binary.length & 0xFF;
-  return join(binary, bytecode);
+  assertNoErrors();
+
+  // The reduce is a complicated way to do file.map(e => e.encoded).flat()
+  // We need it because we have Uint8Arrays in the mix, which don't like flat
+  return Uint8Array.from(file.reduce((a, e) => [...a, ...e.encoded], []));
 }
 
-function unpack(binary) {
-  binary = new Uint8Array(binary);
-
-  assert(binary.slice(0, 3).every((v,i)=> v === MAGIC_NUMBER[i]), ['File should be valid CHIP-8 binary format']);
-  assert(binary.length >= 7, ['File should be complete']);
-
+function header() {
   return {
-    properties: {
-      platform: binary[3],
-      platformName: Object.keys(PLATFORM).find(key => PLATFORM[key] == binary[3]),
-      ...readProperties(binary)
-    },
-    bytecode: binary.slice(binary[4] << 8 | binary[5], binary.length)
+    name: 'header',
+    size: 6,
+    encode: file => [
+      ...MAGIC_NUMBER,
+      VERSION_NUMBER,
+      ...intToBytes(addressOf('bytecodeTable', file, 1, false) || 0, 1),
+      ...intToBytes(addressOf('propertiesTable', file, 1, false) || 0, 1)
+    ]
   };
 }
 
-/**
- * Internal helper functions
- **/
+function encodeBytecode(bytecode) {
+  if ( !bytecode || bytecode.length == 0 )
+    return [[], []];
 
-// Get all the properties referenced in the properties table of this binary and
-// decode them to a JavaScript object.
-function readProperties(binary) {
-  let type;
-  let offset = 6;
-  const properties = {};
-  do {
-    type = binary[offset];
-    const pointer = binary[offset+1] << 8 | binary[offset+2];
-    offset += 3;
-
-    switch(type) {
-      case PROPERTY.name:
-        properties['name'] = bytesToStr(binary.slice(pointer, pointer + findLength(binary, pointer)));
-        break;
-      case PROPERTY.description:
-        properties['description'] = bytesToStr(binary.slice(pointer, pointer + findLength(binary, pointer)));
-        break;
-      case PROPERTY.author:
-        properties['authors'] = properties['authors'] || [];
-        properties['authors'].push(bytesToStr(binary.slice(pointer, pointer + findLength(binary, pointer))));
-        break;
-      case PROPERTY.url:
-        properties['urls'] = properties['urls'] || [];
-        properties['urls'].push(bytesToStr(binary.slice(pointer, pointer + findLength(binary, pointer))));
-        break;
-      case PROPERTY.cyclesPerFrame:
-        properties['cyclesPerFrame'] = bytesToInt(binary.slice(pointer, pointer + 3));
-        break;
-      case PROPERTY.releaseDate:
-        properties['releaseDate'] = new Date(bytesToInt(binary.slice(pointer, pointer + 4)) * 1000);
-        break;
-      case PROPERTY.image:
-        const planes = binary[pointer];
-        const width = binary[pointer+1];
-        const height = binary[pointer+2];
-        properties['image'] = {
-          planes, width, height,
-          data: binary.slice(pointer+3, pointer+3+planes*width*height)
-        };
-        break;
-      case PROPERTY.keys:
-        properties['keys'] = {};
-        for ( let i = 0; i < binary[pointer]; i++ )
-          properties['keys'][Object.keys(KEY).find(key => KEY[key] == binary[pointer+1+i*2])] = binary[pointer+1+i*2+1];
-        break;
-      case PROPERTY.colours:
-        properties['colours'] = [];
-        for ( let i = 0; i < binary[pointer]; i++ )
-          properties['colours'].push([binary[pointer+(3*i)+1], binary[pointer+(3*i)+2], binary[pointer+(3*i)+3]])
-        break;
-      case PROPERTY.compatibleWith:
-        properties['compatibleWith'] = [];
-        for ( let i = 0; i < binary[pointer]; i++ )
-          properties['compatibleWith'].push(binary[pointer+1+i]);
-        break;
-      case PROPERTY.screenOrientation:
-        properties['screenOrientation'] = Object.keys(SCREEN_ORIENTATION).find(key => SCREEN_ORIENTATION[key] == binary[pointer]);
-        break;
-      case PROPERTY.fontData:
-        properties['fontData'] = {
-          address: bytesToInt(binary.slice(pointer, pointer+2)),
-          data: binary.slice(pointer+3, pointer+3+binary[pointer+2])
-        };
-        break;
-      case PROPERTY.toolVanity:
-        properties['toolVanity'] = bytesToStr(binary.slice(pointer, pointer + findLength(binary, pointer)));
-        break;
-    }
-  } while ( type != PROPERTY.termination )
-  return properties;
+  return [
+    [{
+      name: 'bytecodeTable',
+      size: bytecode.reduce((a, b) => a + b.platforms.length, 0) * 5 + 1,
+      encode: file => [
+        ...bytecode.map((b, i) =>
+          b.platforms.map(p => [
+            map(PLATFORM, p),
+            ...intToBytes(addressOf(`bytecode${i}`, file), 2),
+            ...intToBytes(sizeOf(`bytecode${i}`, file), 2)
+          ])
+        ).flat(2),
+        PLATFORM.termination
+      ]
+    }],
+    bytecode.map((b, i) => ({
+      name: `bytecode${i}`,
+      size: b.bytecode.length,
+      encode: () => b.bytecode
+    }))
+  ];
 }
 
-// Take a JavaScript object with properties and encode them into their binary
-// form. If some properties can't be encoded, add errors.
-function makeProperties(props, errors) {
-  // Convert all the properties to the correct data structures
-  let table = [];
+function encodeProperties(properties) {
+  properties = validProperties(properties);
+  if ( Object.keys(properties).length == 0 )
+    return [[], []];
+
+  const propsTable = [];
   const data = [];
-  Object.keys(PROPERTY).forEach(k => {
-    if ( !props.hasOwnProperty(k) || props[k] == undefined || props[k] == '' ) return;
-    switch(k) {
-      case 'name':
-      case 'description':
-        table.push(PROPERTY[k]);
-        data.push(stringProperty(props[k], k, errors));
-        break;
-      case 'author':
-      case 'authors':
-      case 'url':
-      case 'urls':
-        if ( typeof props[k] != 'object' ) props[k] = [props[k]];
-        props[k].forEach(value => {
-          table.push(PROPERTY[k]);
-          data.push(stringProperty(value, k, errors));
-        });
-        break;
-      case 'cyclesPerFrame':
-        table.push(PROPERTY.cyclesPerFrame);
-        data.push(integerProperty(props[k], 3, errors));
-        break;
-      case 'releaseDate':
-        table.push(PROPERTY.releaseDate);
-        if ( typeof props[k] == 'object' ) props[k] = +props[k]/1000;
-        data.push(integerProperty(props[k], 4, errors));
-        break;
-      case 'image':
-        table.push(PROPERTY.image);
-        if ( props[k].hasOwnProperty('width') && props[k].hasOwnProperty('height') && props[k].hasOwnProperty('planes') ) {
-          data.push([
-            ...integerProperty(props[k].planes, 1, errors),
-            ...integerProperty(props[k].width, 1, errors),
-            ...integerProperty(props[k].height, 1, errors),
-            ...props[k].data
-          ]);
-        } else {
-          data.push(props[k]);
-        }
-        break;
-      case 'keys':
-        table.push(PROPERTY.keys);
-        const bytes = [Object.keys(props[k]).length];
-        for ( const key of Object.keys(props[k]) ) {
-          bytes.push(KEY[key]);
-          bytes.push(props[k][key]);
-        }
-        data.push(bytes);
-        break;
-      case 'colours':
-        table.push(PROPERTY.colours);
-        data.push([props[k].length, ...props[k].flat()]);
-        break;
-      case 'compatibleWith':
-        table.push(PROPERTY.compatibleWith);
-        data.push([props[k].length, ...props[k]]);
-        break;
-      case 'screenOrientation':
-        table.push(PROPERTY.screenOrientation);
-        data.push(SCREEN_ORIENTATION[props[k]]);
-        break;
-      case 'fontData':
-        table.push(PROPERTY.fontData);
-        data.push([
-          ...intToBytes(props[k].address, 2),
-          ...intToBytes(props[k].data.length, 1),
-          ...props[k].data
-        ]);
-        break;
-      case 'toolVanity':
-        table.push(PROPERTY.toolVanity);
-        data.push(stringProperty(props[k], k, errors));
-        break;
-    }
+
+  Object.keys(properties).forEach(key => {
+    // Interpret every property as a list
+    if ( typeof properties[key].forEach != 'function' || key == 'colours' ) properties[key] = [properties[key]];
+    // Expect a single value, except for these properties:
+    if ( !['author', 'authors', 'url', 'urls'].includes(key) )
+      assert(properties[key].length == 1, `Having more than one value for ${key} is not valid in CBF.`);
+
+    // Encode and add each property to the properties table
+    properties[key].forEach((p, i) => {
+      const prop = encodeProperty(key, p);
+      data.push({
+        name: `${key}${i}`,
+        size: prop.length,
+        encode: () => prop
+      });
+      propsTable.push(file => [
+        PROPERTY[key],
+        ...intToBytes(addressOf(`${key}${i}`, file), 2)
+      ]);
+    });
   });
 
-  // Set addresses in the properties table
-  let offset = MAGIC_NUMBER.length + 1 + 2 + table.length * 3 + 1;
-  table = table.map((prop, i) => {
-    const entry = [prop, offset >> 8 & 0xFF, offset & 0xFF];
-    offset += data[i].length;
-    return entry;
-  });
-  table.push(PROPERTY.termination);
+  return [
+    [{
+      name: 'propertiesTable',
+      size: propsTable.length * 3 + 1,
+      encode: file => [
+        ...propsTable.map(p => p(file)).flat(),
+        PROPERTY.termination
+      ]
+    }],
+    data
+  ];
+}
 
-  return join(table.flat(), data.flat());
+function validProperties(properties) {
+  if ( !properties ) return {};
+  return Object.keys(properties)
+               .filter(prop => Object.keys(PROPERTY).includes(prop))
+               .reduce((a, prop) => {
+                 a[prop] = properties[prop];
+                 return a;
+               }, {});
+}
+
+function addressOf(name, file, bytes=2, strict=true) {
+  let address = 0;
+  let i;
+  for ( i = 0; i < file.length && file[i].name != name; i++ )
+    address += file[i].size;
+  if ( strict ) assert(i != file.length, `Could not find '${name}' in the file`);
+  if ( i == file.length ) return 0;
+  assert(typeof address == 'number' && address >= 0, `Expecting a positive number for the address of '${name}'`);
+  assert(address < Math.pow(2, 8*bytes), `Can't fit address of '${name}' in ${bytes} byte(s)`);
+  return address;
+}
+
+function sizeOf(name, file, bytes=2) {
+  const size = file.find(f => f.name == name).size;
+  assert(typeof size == 'number' && size >= 0, `Expecting a positive number for the size of '${name}'`);
+  assert(size < Math.pow(2, 8*bytes), `Can't fit size of '${name}' in ${bytes} byte(s)`);
+  return size;
+}
+
+// Sort function
+function bySize(a, b) {
+  return a.size - b.size;
+}
+
+// Take a property and encode it into its binary form.
+function encodeProperty(key, value) {
+  switch(key) {
+    case 'name':
+    case 'description':
+    case 'author':
+    case 'authors':
+    case 'url':
+    case 'urls':
+    case 'toolVanity':
+      return stringProperty(value);
+    case 'cyclesPerFrame':
+      return integerProperty(value, 3);
+    case 'releaseDate':
+      if ( typeof value == 'object' ) value = +value/1000;
+      return integerProperty(value, 4);
+    case 'image':
+      if ( value.hasOwnProperty('width') && value.hasOwnProperty('height') && value.hasOwnProperty('planes') ) {
+        return [
+          ...integerProperty(value.planes, 1),
+          ...integerProperty(value.width, 1),
+          ...integerProperty(value.height, 1),
+          ...value.data
+        ];
+      } else {
+        return value;
+      }
+    case 'keys':
+      const bytes = [Object.keys(value).length];
+      for ( const key of Object.keys(value) ) {
+        bytes.push(KEY[key]);
+        bytes.push(value[key]);
+      }
+      return bytes;
+    case 'colours':
+      return [value.length, ...value.flat()];
+    case 'screenOrientation':
+      return [map(SCREEN_ORIENTATION, value)];
+    case 'fontData':
+      return [
+        ...intToBytes(value.address, 2),
+        ...intToBytes(value.data.length, 1),
+        ...value.data
+      ];
+    default:
+      assert(false, `Don't know how to encode property '${key}'. This shouldn't happen.`)
+      return [];
+  }
 }
 
 // Encode a string into its binary form. If it can't be encoded, add errors.
-function stringProperty(str, prop, errors) {
-  if ( !assert(typeof str == 'string', `Value should be a string: ${str}`, errors) ) return [];
+function stringProperty(str) {
+  if ( !assert(typeof str == 'string', `Value should be a string: '${str}'`) ) return [];
   const stringBytes = strToBytes(str);
   stringBytes.push(0);
   return stringBytes;
 }
 
 // Encode an integer into its binary form. If it can't be encoded, add errors.
-function integerProperty(value, bytes, errors) {
-  if ( !assert(typeof value == 'number', `Value should be a number: ${value}`, errors) ) return [];
+function integerProperty(value, bytes) {
+  if ( !assert(typeof value == 'number', `Value should be a number: '${value}'`) ) return [];
   return intToBytes(value, bytes);
 }
 
@@ -224,15 +212,6 @@ function integerProperty(value, bytes, errors) {
 // the string.
 function strToBytes(str) {
   return str.split('').map(c => c.charCodeAt(0) & 0xFF);
-}
-
-// Take an array of ascii values and convert back to a string
-function bytesToStr(bytes) {
-  return String.fromCharCode(...bytes);
-}
-
-function findLength(binary, offset) {
-  return binary.slice(offset).indexOf(0);
 }
 
 // Take an integer value and convert it to `bytes` number of bytes
@@ -244,42 +223,151 @@ function intToBytes(value, bytes) {
   return result;
 }
 
+// Check to see if `item` is in `list`, either as numeric value or as textual
+// value. If so, return its numeric value. Otherwise, add an error.
+function map(list, item) {
+  if ( Object.values(list).includes(item) ) return item;
+  if ( Object.keys(list).includes(item) ) return list[item];
+  if ( Object.values(list).includes(+item) ) return +item;
+  if ( Object.keys(list).includes(+item) ) return list[+item];
+  assert(false, `Mapping error: '${item}' is not a valid value`);
+}
+
+/**
+ * Decoder
+ **/
+
+function unpack(binary) {
+  binary = new Uint8Array(binary);
+
+  assert(binary.slice(0, 3).every((v,i)=> v === MAGIC_NUMBER[i]), 'File should be valid CHIP-8 binary format');
+  assert(binary[3] == VERSION_NUMBER, 'File should have a compatible version number')
+  assert(binary.length >= 6, 'File should be complete');
+  assertNoErrors();
+
+  const properties = decodeProperties(binary);
+  const bytecode = decodeBytecode(binary);
+  assertNoErrors();
+
+  return { properties, bytecode };
+}
+
+function decodeBytecode(binary) {
+  if ( binary[4] == 0 ) return [];
+  const bytecode = {};
+  let i;
+  for ( i = binary[4]; i < binary.length && binary[i] != PLATFORM.termination; i += 5 ) {
+    const type = binary[i];
+    if ( !assert(Object.values(PLATFORM).includes(type), `Platform type '${type}' is not a valid type`) ) return [];
+    const typeName = Object.keys(PLATFORM).find(key => PLATFORM[key] == type);
+    const where = [
+      bytesToInt([binary[i+1], binary[i+2]]),  // Pointer
+      bytesToInt([binary[i+3], binary[i+4]])   // Size
+    ];
+    bytecode[JSON.stringify(where)] ||= {
+      platforms: [],
+      platformNames: [],
+      bytecode: binary.slice(where[0], where[0] + where[1])
+    };
+    bytecode[JSON.stringify(where)].platforms.push(type);
+    bytecode[JSON.stringify(where)].platformNames.push(typeName);
+  }
+  assert(i < binary.length, 'Ran out of the file trying to load the bytecode table');
+  return Object.values(bytecode);
+}
+
+function decodeProperties(binary) {
+  if ( binary[5] == 0 ) return {};
+  const properties = {};
+  let i;
+  for ( i = binary[5]; i < binary.length && binary[i] != PROPERTY.termination; i += 3 ) {
+    const type = binary[i];
+    if ( !assert(Object.values(PROPERTY).includes(type), `Property type '${type}' is not a valid type`) ) return properties;
+    const typeName = Object.keys(PROPERTY).find(key => PROPERTY[key] == type);
+    const pointer = bytesToInt([binary[i+1], binary[i+2]]);
+    if ( [PROPERTY.author, PROPERTY.url].includes(type) ) {
+      properties[typeName] ||= [];
+      properties[typeName].push(decodeProperty(binary, type, pointer));
+    } else {
+      properties[typeName] = decodeProperty(binary, type, pointer);
+    }
+  }
+  assert(i < binary.length, 'Ran out of the file trying to load the properties table');
+  return properties;
+}
+
+function decodeProperty(binary, type, pointer) {
+  switch(type) {
+    case PROPERTY.name:
+    case PROPERTY.description:
+    case PROPERTY.author:
+    case PROPERTY.url:
+    case PROPERTY.toolVanity:
+      return bytesToStr(binary.slice(pointer, pointer + findLength(binary, pointer)));
+    case PROPERTY.cyclesPerFrame:
+      return bytesToInt(binary.slice(pointer, pointer + 3));
+    case PROPERTY.releaseDate:
+      return new Date(bytesToInt(binary.slice(pointer, pointer + 4)) * 1000);
+    case PROPERTY.image:
+      const planes = binary[pointer];
+      const width = binary[pointer+1];
+      const height = binary[pointer+2];
+      return {
+        planes, width, height,
+        data: binary.slice(pointer+3, pointer+3+planes*width*height)
+      };
+    case PROPERTY.keys:
+      const keys = {};
+      for ( let i = 0; i < binary[pointer]; i++ )
+        keys[Object.keys(KEY).find(key => KEY[key] == binary[pointer+1+i*2])] = binary[pointer+1+i*2+1];
+      return keys;
+    case PROPERTY.colours:
+      const colours = [];
+      for ( let i = 0; i < binary[pointer]; i++ )
+        colours.push([binary[pointer+(3*i)+1], binary[pointer+(3*i)+2], binary[pointer+(3*i)+3]])
+      return colours;
+    case PROPERTY.screenOrientation:
+      return Object.keys(SCREEN_ORIENTATION).find(key => SCREEN_ORIENTATION[key] == binary[pointer]);
+    case PROPERTY.fontData:
+      return {
+        address: bytesToInt(binary.slice(pointer, pointer+2)),
+        data: binary.slice(pointer+3, pointer+3+binary[pointer+2])
+      };
+    default:
+      assert(false, `Don't know how to decode property type '${type}'`);
+  }
+}
+
+// Take an array of ascii values and convert back to a string
+function bytesToStr(bytes) {
+  return String.fromCharCode(...bytes);
+}
+
+function findLength(binary, offset) {
+  return binary.slice(offset).indexOf(0);
+}
+
 // Take an array of bytes and convert it into an integer
 function bytesToInt(bytes) {
   return bytes.reduce((a, v, i) => v << 8*(bytes.length-1-i) | a, 0);
 }
 
-// Return the concatenation of all parameters as a Uint8Array, also works when
-// using Uint8Arrays as inputs.
-function join(...arrays) {
-  arrays = arrays.map(arr => typeof arr == 'number' ? [arr] : arr).filter(arr => arr);
-  const length = arrays.map(arr => arr.length).reduce((l, a) => l + a, 0);
-  const merged = new Uint8Array(length);
-  let offset = 0;
-  arrays.forEach(arr => {
-    merged.set(arr, offset);
-    offset += arr.length;
-  });
-  return merged;
+/**
+ * Error handling
+ **/
+
+let errors;
+
+function resetErrors() {
+  errors = [];
 }
 
-// Check to see if `item` is in `list`, either as numeric value or as textual
-// value. If so, return its numeric value. Otherwise, add an error.
-function map(list, item, errors) {
-  if ( Object.values(list).includes(item) ) return item;
-  if ( Object.keys(list).includes(item) ) return list[item];
-  if ( Object.values(list).includes(+item) ) return +item;
-  if ( Object.keys(list).includes(+item) ) return list[+item];
-  errors.push(`Mapping error: item ${item} is not a valid value`);
+function assert(assertion, message) {
+  return assertion || !errors.push(message);
 }
 
-// Check that an assertion holds. Otherwise add message to errors array, or if
-// no errors array is present, throw the message.
-function assert(assertion, message, errors) {
-  if ( assertion ) return true;
-  if ( !errors ) throw message;
-  errors.push(message);
-  return false;
+function assertNoErrors() {
+  if ( errors.length > 0 ) throw errors;
 }
 
 /**
@@ -287,62 +375,64 @@ function assert(assertion, message, errors) {
  **/
 
 MAGIC_NUMBER = strToBytes('CBF');
+VERSION_NUMBER = 0;
 
 PLATFORM = {
-  'CHIP-8':                                                           0x00,
-  'CHIP-8 1/2':                                                       0x01,
-  'CHIP-8I':                                                          0x02,
-  'CHIP-8 II aka. Keyboard Kontrol':                                  0x03,
-  'CHIP-8III':                                                        0x04,
-  'Two-page display for CHIP-8':                                      0x05,
-  'CHIP-8C':                                                          0x06,
-  'CHIP-10':                                                          0x07,
-  'CHIP-8 modification for saving and restoring variables':           0x08,
-  'Improved CHIP-8 modification for saving and restoring variables':  0x09,
-  'CHIP-8 modification with relative branching':                      0x0A,
-  'Another CHIP-8 modification with relative branching':              0x0B,
-  'CHIP-8 modification with fast, single-dot DXYN':                   0x0C,
-  'CHIP-8 with I/O port driver routine':                              0x0D,
-  'CHIP-8 8-bit multiply and divide':                                 0x0E,
-  'HI-RES CHIP-8 (four-page display)':                                0x0F,
-  'HI-RES CHIP-8 with I/O':                                           0x10,
-  'HI-RES CHIP-8 with page switching':                                0x11,
-  'CHIP-8E':                                                          0x12,
-  'CHIP-8 with improved BNNN':                                        0x13,
-  'CHIP-8 scrolling routine':                                         0x14,
-  'CHIP-8X':                                                          0x15,
-  'Two-page display for CHIP-8X':                                     0x16,
-  'Hi-res CHIP-8X':                                                   0x17,
-  'CHIP-8Y':                                                          0x18,
-  'CHIP-8 “Copy to Screen”':                                          0x19,
-  'CHIP-BETA':                                                        0x1A,
-  'CHIP-8M':                                                          0x1B,
-  'Multiple Nim interpreter':                                         0x1C,
-  'Double Array Modification':                                        0x1D,
-  'CHIP-8 for DREAM 6800 (CHIPOS)':                                   0x1E,
-  'CHIP-8 with logical operators for DREAM 6800 (CHIPOSLO)':          0x1F,
-  'CHIP-8 for DREAM 6800 with joystick':                              0x20,
-  '2K CHIPOS for DREAM 6800':                                         0x21,
-  'CHIP-8 for ETI-660':                                               0x22,
-  'CHIP-8 with color support for ETI-660':                            0x23,
-  'CHIP-8 for ETI-660 with high resolution':                          0x24,
-  'CHIP-8 for COSMAC ELF':                                            0x25,
-  'CHIP-VDU / CHIP-8 for the ACE VDU':                                0x26,
-  'CHIP-8 AE (ACE Extended)':                                         0x27,
-  'Dreamcards Extended CHIP-8 V2.0':                                  0x28,
-  'Amiga CHIP-8 interpreter':                                         0x29,
-  'CHIP-48':                                                          0x2A,
-  'SUPER-CHIP 1.0':                                                   0x2B,
-  'SUPER-CHIP 1.1':                                                   0x2C,
-  'GCHIP':                                                            0x2D,
-  'SCHIP Compatibility (SCHPC) and GCHIP Compatibility (GCHPC)':      0x2E,
-  'VIP2K CHIP-8':                                                     0x2F,
-  'SUPER-CHIP with scroll up':                                        0x30,
-  'chip8run':                                                         0x31,
-  'Mega-Chip':                                                        0x32,
-  'XO-CHIP':                                                          0x33,
-  'Octo':                                                             0x34,
-  'CHIP-8 Classic / Color':                                           0x35,
+  'termination':                                                      0x00,
+  'CHIP-8':                                                           0x01,
+  'CHIP-8 1/2':                                                       0x02,
+  'CHIP-8I':                                                          0x03,
+  'CHIP-8 II aka. Keyboard Kontrol':                                  0x04,
+  'CHIP-8III':                                                        0x05,
+  'Two-page display for CHIP-8':                                      0x06,
+  'CHIP-8C':                                                          0x07,
+  'CHIP-10':                                                          0x08,
+  'CHIP-8 modification for saving and restoring variables':           0x09,
+  'Improved CHIP-8 modification for saving and restoring variables':  0x0A,
+  'CHIP-8 modification with relative branching':                      0x0B,
+  'Another CHIP-8 modification with relative branching':              0x0C,
+  'CHIP-8 modification with fast, single-dot DXYN':                   0x0D,
+  'CHIP-8 with I/O port driver routine':                              0x0E,
+  'CHIP-8 8-bit multiply and divide':                                 0x0F,
+  'HI-RES CHIP-8 (four-page display)':                                0x10,
+  'HI-RES CHIP-8 with I/O':                                           0x11,
+  'HI-RES CHIP-8 with page switching':                                0x12,
+  'CHIP-8E':                                                          0x13,
+  'CHIP-8 with improved BNNN':                                        0x14,
+  'CHIP-8 scrolling routine':                                         0x15,
+  'CHIP-8X':                                                          0x16,
+  'Two-page display for CHIP-8X':                                     0x17,
+  'Hi-res CHIP-8X':                                                   0x18,
+  'CHIP-8Y':                                                          0x19,
+  'CHIP-8 “Copy to Screen”':                                          0x1A,
+  'CHIP-BETA':                                                        0x1B,
+  'CHIP-8M':                                                          0x1C,
+  'Multiple Nim interpreter':                                         0x1D,
+  'Double Array Modification':                                        0x1E,
+  'CHIP-8 for DREAM 6800 (CHIPOS)':                                   0x1F,
+  'CHIP-8 with logical operators for DREAM 6800 (CHIPOSLO)':          0x20,
+  'CHIP-8 for DREAM 6800 with joystick':                              0x21,
+  '2K CHIPOS for DREAM 6800':                                         0x22,
+  'CHIP-8 for ETI-660':                                               0x23,
+  'CHIP-8 with color support for ETI-660':                            0x24,
+  'CHIP-8 for ETI-660 with high resolution':                          0x25,
+  'CHIP-8 for COSMAC ELF':                                            0x26,
+  'CHIP-VDU / CHIP-8 for the ACE VDU':                                0x27,
+  'CHIP-8 AE (ACE Extended)':                                         0x28,
+  'Dreamcards Extended CHIP-8 V2.0':                                  0x29,
+  'Amiga CHIP-8 interpreter':                                         0x2A,
+  'CHIP-48':                                                          0x2B,
+  'SUPER-CHIP 1.0':                                                   0x2C,
+  'SUPER-CHIP 1.1':                                                   0x2D,
+  'GCHIP':                                                            0x2E,
+  'SCHIP Compatibility (SCHPC) and GCHIP Compatibility (GCHPC)':      0x2F,
+  'VIP2K CHIP-8':                                                     0x30,
+  'SUPER-CHIP with scroll up':                                        0x31,
+  'chip8run':                                                         0x32,
+  'Mega-Chip':                                                        0x33,
+  'XO-CHIP':                                                          0x34,
+  'Octo':                                                             0x35,
+  'CHIP-8 Classic / Color':                                           0x36,
 };
 
 PROPERTY = {
@@ -350,18 +440,18 @@ PROPERTY = {
   'cyclesPerFrame':     0x01,
   'name':               0x02,
   'description':        0x03,
-  'author':             0x04,
   'authors':            0x04,
-  'url':                0x05,
+  'author':             0x04,
   'urls':               0x05,
+  'url':                0x05,
   'releaseDate':        0x06,
   'image':              0x07,
   'keys':               0x08,
   'colours':            0x09,
-  'compatibleWith':     0x0A,
   'screenOrientation':  0x0B,
   'fontData':           0x0C,
-  'toolVanity':         0x0D
+  'toolVanity':         0x0D,
+  'licenseInformation': 0x0E
 };
 
 KEY = {
@@ -374,11 +464,15 @@ KEY = {
 }
 
 SCREEN_ORIENTATION = {
-  'normal':     0x00,  // Display is on its feet, top is up
-  'right':      0x01,  // Display is put on its right side, left side is up
-  'left':       0x02,  // Display is put on its left side, right side is up
-  'upsidedown': 0x03,  // Display is upside down, bottom is up
+  'normal':         0x00,  // Display is on its feet, top is up
+  'left side up':   0x01,  // Display is put on its right side, left side is up
+  'right side up':  0x02,  // Display is put on its left side, right side is up
+  'upside down':    0x03,  // Display is upside down, bottom is up
 }
+
+/**
+ * External interface
+ **/
 
 module.exports = {
   pack,
