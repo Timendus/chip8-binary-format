@@ -61,7 +61,8 @@ format.
   * The variable size [data segment](#data-segment), that holds the properties
     (if any are present) and the bytecode (the actual CHIP-8 binary)
 
-This is the absolute minimum content that a file can have:
+This is the absolute minimum content that a file with an actual program in it
+can have:
 
 ```python
 ## Header
