@@ -3,6 +3,12 @@
   "author": "Timendus",
   "url": "https://github.com/Timendus/chip8-test-suite",
   "description": "A single ROM image containing six distinct tests that will aid you in developing your own CHIP-8, SCHIP or XO-CHIP interpreter (or \"emulator\")",
+  "platforms": [
+    "CHIP-8",
+    "SUPER-CHIP 1.0",
+    "SUPER-CHIP 1.1",
+    "XO-CHIP"
+  ],
   "keys": {
     "up": 14,
     "down": 15,

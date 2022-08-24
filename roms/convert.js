@@ -11,14 +11,19 @@ glob(__dirname + '/ch8/*.ch8', {}, (err, files)=>{
     const cbfFile = './c8b/' + bareFilename.substr(0, bareFilename.lastIndexOf('.')) + '.c8b';
     console.log(`./ch8/${bareFilename} -> ${cbfFile}`);
 
-    const bytecode = fs.readFileSync(file);
     const properties = fs.existsSync(propsFile)
       ? JSON.parse(fs.readFileSync(propsFile, { encoding: 'UTF8' }))
       : {};
+    const bytecode = [
+      {
+        platforms: properties.platforms,
+        bytecode: new Uint8Array(fs.readFileSync(file))
+      }
+    ];
 
     let binary;
     try {
-      binary = cbf.pack({ properties, bytecode });
+      binary = cbf.pack({ properties, bytecode, verbose: false });
       fs.writeFileSync(cbfFile, binary);
     } catch(e) {
       if ( 'join' in e )
