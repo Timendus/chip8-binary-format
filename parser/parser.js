@@ -240,6 +240,7 @@ function map(list, item) {
 function unpack(binary) {
   binary = new Uint8Array(binary);
 
+  resetErrors();
   assert(binary.slice(0, 3).every((v,i)=> v === MAGIC_NUMBER[i]), 'File should be valid CHIP-8 binary format');
   assert(binary[3] == VERSION_NUMBER, 'File should have a compatible version number')
   assert(binary.length >= 6, 'File should be complete');
