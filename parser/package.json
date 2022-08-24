@@ -1,7 +1,7 @@
 {
   "name": "chip8-binary-format",
   "version": "0.1.0",
-  "description": "A library to pack and unpack `.c8b` files",
+  "description": "A zero-depenencies library to pack and unpack `.c8b` files",
   "files": [
     "parser.js"
   ],
@@ -22,13 +22,17 @@
     "chip8",
     "schip",
     "superchip",
+    "super-chip",
     "xo-chip",
+    "octo",
     "binary",
     "file",
     "parser",
     "format",
     "pack",
-    "unpack"
+    "unpack",
+    "encode",
+    "decode"
   ],
   "author": "Timendus",
   "license": "GPL-3.0-or-later",
